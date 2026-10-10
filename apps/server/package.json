@@ -13,10 +13,14 @@
     "test:integration": "tsx --env-file-if-exists=.env scripts/test-integration.ts",
     "db:generate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js generate",
     "db:migrate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate deploy",
-    "db:provision": "tsx --env-file=.env scripts/provision-runtime.ts"
+    "db:provision": "tsx --env-file=.env scripts/provision-runtime.ts",
+    "db:bootstrap": "tsx --env-file-if-exists=.env scripts/bootstrap.ts"
   },
   "dependencies": {
+    "@better-auth/expo": "1.7.7",
     "@better-auth/prisma-adapter": "1.7.7",
+    "@better-auth/utils": "0.4.2",
+    "@portl/contracts": "workspace:*",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "better-auth": "1.7.7",

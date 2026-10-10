@@ -7,14 +7,15 @@
     "node": ">=24.14.0 <25"
   },
   "scripts": {
-    "dev:api": "pnpm --filter @portl/server dev:api",
-    "dev:mobile": "pnpm --filter @portl/mobile start",
+    "dev:api": "pnpm build:contracts && pnpm --filter @portl/server dev:api",
+    "dev:mobile": "pnpm build:contracts && pnpm --filter @portl/mobile start",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @portl/server test --run",
-    "build:server": "pnpm --filter @portl/server build",
+    "typecheck": "pnpm build:contracts && pnpm -r typecheck",
+    "test": "pnpm build:contracts && pnpm --filter @portl/server test --run && pnpm --filter @portl/mobile test",
+    "build:server": "pnpm build:contracts && pnpm --filter @portl/server build",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build:contracts": "pnpm --filter @portl/contracts build"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

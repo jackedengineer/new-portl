@@ -38,6 +38,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @portl/server db:generate
+      - run: pnpm build:contracts
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck

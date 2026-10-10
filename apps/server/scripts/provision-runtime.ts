@@ -3,6 +3,8 @@ import { chmod, readFile, rename, writeFile } from 'node:fs/promises';
 
 import pg from 'pg';
 
+import { grantRuntime } from '../src/database/runtime-grants.js';
+
 import { postgresOptions } from '../src/database/connection.js';
 
 // Run after migrations, against the development branch only. Never print credentials.
@@ -25,9 +27,15 @@ async function provision() {
       throw new Error('Connections must target the same development database');
     }
     if (existing && runtimeUrl.username !== ownerUrl.username) {
-      console.log(
-        'Runtime URL already uses a separate role; verify it through API startup. No credentials changed.',
+      const role = decodeURIComponent(runtimeUrl.username);
+      const result = await client.query(
+        'SELECT rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole AS unsafe FROM pg_roles WHERE rolname = $1',
+        [role],
       );
+      if (result.rows.length !== 1 || result.rows[0].unsafe)
+        throw new Error('Unsafe runtime role');
+      await grantRuntime(client, role);
+      console.log('Restricted runtime grants updated; credentials unchanged.');
       return;
     }
     const role = `portl_runtime_${randomBytes(6).toString('hex')}`;
@@ -41,20 +49,7 @@ async function provision() {
       await client.query(
         `GRANT CONNECT ON DATABASE ${pg.escapeIdentifier(decodeURIComponent(ownerUrl.pathname.slice(1)))} TO ${identifier}`,
       );
-      await client.query(`GRANT USAGE ON SCHEMA portl_auth TO ${identifier}`);
-      const tables = [
-        'User',
-        'Session',
-        'Account',
-        'Verification',
-        'RateLimit',
-        'OtpThrottle',
-      ];
-      for (const table of tables) {
-        await client.query(
-          `GRANT SELECT, INSERT, UPDATE, DELETE ON portl_auth.${pg.escapeIdentifier(table)} TO ${identifier}`,
-        );
-      }
+      await grantRuntime(client, role);
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
