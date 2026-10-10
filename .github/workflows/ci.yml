@@ -18,6 +18,17 @@ jobs:
     timeout-minutes: 10
     env:
       DIRECT_DATABASE_URL: postgresql://postgres:portl-ci-only@localhost:5432/portl_test
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: portl_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: portl-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d portl_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -31,6 +42,12 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @portl/server db:migrate
+      - name: Prepare ephemeral CI runtime credentials
+        working-directory: apps/server
+        run: node --input-type=module -e 'import {writeFileSync} from "node:fs"; writeFileSync(".env", `DIRECT_DATABASE_URL=${process.env.DIRECT_DATABASE_URL}\nDATABASE_URL=${process.env.DIRECT_DATABASE_URL}\n`, {mode:0o600});'
+      - run: pnpm --filter @portl/server db:provision
+      - run: pnpm --filter @portl/server test:integration
       - run: pnpm build:server
       - name: Export Android and iOS JavaScript bundles
         run: pnpm --filter @portl/mobile exec expo export --platform ios --platform android

@@ -8,8 +8,9 @@
     "start:api": "node --env-file-if-exists=.env dist/api.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
-    "lint": "eslint src scripts prisma.config.ts",
+    "lint": "eslint src scripts prisma.config.ts vitest.config.ts vitest.integration.config.ts",
     "test": "vitest",
+    "test:integration": "tsx --env-file-if-exists=.env scripts/test-integration.ts",
     "db:generate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js generate",
     "db:migrate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate deploy",
     "db:provision": "tsx --env-file=.env scripts/provision-runtime.ts"
