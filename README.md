@@ -1,6 +1,6 @@
 # Portl
 
-An Expo / React Native society management app with a TypeScript / Express backend. The backend now supports Better Auth email OTP with PostgreSQL sessions and Resend delivery. The mobile app remains a shell; its login screens, society onboarding and role workflows are upcoming slices.
+An Expo / React Native society management app with a TypeScript / Express backend. This slice implements email OTP login, email-bound resident invitations, resident applications and administrator review across independent societies. Society authority is granted only by a valid invitation or an admin approval.
 
 ## Local development
 
@@ -22,9 +22,20 @@ In another terminal:
 pnpm dev:mobile
 ```
 
-The current mobile shell can run in a compatible Expo Go installation. Better Auth SecureStore integration and push notifications will be tested using development builds when added. Native app identifiers, signing and store release configuration will be selected before those builds; the generated template icons are placeholders.
+The app uses Expo Router, TanStack Query, shared Zod contracts and Better Auth's Expo client. Native session cookies use SecureStore; cached profiles cannot authorize access. Set the device-reachable API origin in the ignored mobile environment file and restart Metro after changes. A browser preview also requires its exact origin in the server's `TRUSTED_ORIGINS` (for example `http://localhost:8081`). The generated template icons and native identifiers remain release setup tasks. Signed development builds and physical-device verification are still required.
 
-`GET /health/live` reports process liveness; `/health/ready` checks database connectivity. Neither verifies email delivery. Better Auth mounts under `/api/auth`; `/v1/me` returns a protected identity projection. New verified identities have no memberships or society authority. The membership module will implement invitation acceptance and admin-approved resident applications.
+`GET /health/live` reports process liveness; `/health/ready` checks database connectivity. Neither verifies email delivery. Better Auth mounts under `/api/auth`; `/v1/me` returns a protected identity and current membership projection. A new verified identity can apply using a society code or accept an invitation addressed to its verified email. Pending applications grant no society access. Admin review and invitation management require an active admin membership and a recent authenticator verification.
+
+## Provision demo societies and the first administrator
+
+There is no public endpoint for creating societies or granting admin roles. Use the controlled development bootstrap with the migration-owner connection; never put that connection in the API or mobile app.
+
+1. Copy `apps/server/bootstrap.example.json` to an ignored file under `apps/server/.local/`, replace the synthetic email, society codes and flat list, and restrict the file to mode `0600`.
+2. Run `pnpm --filter @portl/server db:bootstrap prepare .local/your-config.json` from the repository root. The generated private pending file contains an authenticator enrollment URI; import it into your authenticator app. It is a credential: do not paste it into chat, Git, logs or screenshots.
+3. Run `pnpm --filter @portl/server db:bootstrap confirm .local/bootstrap.pending.json` and enter a current authenticator code at the prompt. Only a successful confirmation creates the initial demo societies and admin membership. The pending credential file is then removed.
+4. Start the API and sign in with that admin email. In the society card, choose **Manage resident onboarding**, verify the authenticator code, then review applications or create invitations.
+
+Bootstrap refuses to replace an existing authenticator. Credential recovery and production society provisioning require a separate operator procedure before a public launch. Invitations are shared manually using the device share sheet; only OTPs are delivered through Resend. Invitation codes are shown once, email-bound, single-use and expire after seven days. Multiple verified household members can share a flat; `OWNER`/`TENANT` is the recorded residency relationship, not proof of legal ownership.
 
 ## Checks
 
@@ -42,4 +53,4 @@ Integration tests use real PostgreSQL and synthetic identities with a fake email
 
 GitHub Actions runs these checks on pushes to `main` and pull requests. A separate dependency-audit job reports upstream issues without hiding them; see [the current dependency review](DEPENDENCY_REVIEW.md). Deployment and store submission are not enabled by this workflow. Branch protection and required check settings must be configured before merging later feature pull requests.
 
-Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.2.0 (CHG-0003); specification editions are independent of app versions. Before public deployment, resolve the documented privacy/retention, admin step-up, demo provisioning and Railway proxy configuration gates.
+Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.3.0 (CHG-0004); specification editions are independent of app versions. Visitor operations, community modules, push, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device and Railway proxy configuration gates.

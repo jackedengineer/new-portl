@@ -5,6 +5,10 @@ import helmet from 'helmet';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Logger } from 'pino';
 
+import { registryRouter } from './registry/router.js';
+import { DomainError } from './registry/context.js';
+import { registryService } from './registry/service.js';
+
 import { authRoutes, type PortlAuth } from './auth/auth.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 
@@ -32,6 +36,24 @@ export function createApp(logger?: Logger, services?: AppServices) {
   });
 
   if (services) {
+    app.use((req, res, next) => {
+      const origin = req.get('origin');
+      if (origin && services.auth.acceptsOrigin(origin)) {
+        res.setHeader('access-control-allow-origin', origin);
+        res.setHeader('access-control-allow-credentials', 'true');
+        res.vary('Origin');
+        if (req.method === 'OPTIONS') {
+          res.setHeader('access-control-allow-methods', 'GET, POST');
+          res.setHeader('access-control-allow-headers', 'content-type');
+          res.sendStatus(204);
+          return;
+        }
+      } else if (req.method === 'OPTIONS') {
+        res.sendStatus(403);
+        return;
+      }
+      next();
+    });
     app.get('/health/ready', async (_req, res) => {
       try {
         await services.db.$queryRaw`SELECT 1`;
@@ -103,12 +125,31 @@ export function createApp(logger?: Logger, services?: AppServices) {
         return;
       }
       const { id, email, name, emailVerified } = session.user;
+      const memberships = await registryService(services.db).memberships({
+        userId: id,
+        email,
+        sessionId: session.session.id,
+        requestId: String(res.getHeader('x-request-id')),
+      });
+      const assurance = await services.db.adminAssurance.findUnique({
+        where: { sessionId: session.session.id },
+      });
+      const authenticator = await services.db.twoFactor.findUnique({
+        where: { userId: id },
+        select: { verified: true },
+      });
       res.json({
         user: { id, email, name, emailVerified },
-        memberships: [],
-        onboardingRequired: true,
+        memberships,
+        onboardingRequired: memberships.length === 0,
+        adminAssuredUntil:
+          assurance && assurance.expiresAt > new Date()
+            ? assurance.expiresAt.toISOString()
+            : null,
+        adminAuthenticatorConfigured: !!authenticator?.verified,
       });
     });
+    app.use('/v1', registryRouter(services.auth, services.db));
   }
 
   app.use(
@@ -120,6 +161,17 @@ export function createApp(logger?: Logger, services?: AppServices) {
     ) => {
       if (res.headersSent) {
         next(error);
+        return;
+      }
+      if (error instanceof DomainError) {
+        if (error.status === 429) res.setHeader('retry-after', '60');
+        res.status(error.status).json({
+          error: {
+            code: error.code,
+            message: error.message,
+            requestId: res.getHeader('x-request-id'),
+          },
+        });
         return;
       }
       const status =

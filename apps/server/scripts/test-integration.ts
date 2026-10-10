@@ -10,7 +10,14 @@ if (!url)
 
 const result = spawnSync(
   'pnpm',
-  ['exec', 'vitest', 'run', '--config', 'vitest.integration.config.ts'],
+  [
+    'exec',
+    'vitest',
+    'run',
+    '--config',
+    'vitest.integration.config.ts',
+    ...process.argv.slice(2),
+  ],
   {
     stdio: 'inherit',
     env: { ...process.env, NODE_ENV: 'test', PORTL_TEST_DATABASE_URL: url },

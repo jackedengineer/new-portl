@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["portl_auth"]
+  schemas  = ["portl_auth", "portl_registry"]
 }
 
 model User {
@@ -17,6 +17,12 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  twoFactorEnabled Boolean @default(false)
+  twoFactor TwoFactor?
+  totpUses AdminTotpUse[]
+  memberships Membership[]
+  occupancies Occupancy[]
+  applications ResidentApplication[]
   sessions      Session[]
   accounts      Account[]
 
@@ -31,6 +37,7 @@ model Session {
   updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
+  assurance AdminAssurance?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -87,4 +94,164 @@ model OtpThrottle {
 
   @@index([resetAt])
   @@schema("portl_auth")
+}
+
+model TwoFactor {
+  id String @id
+  userId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret String
+  backupCodes String
+  verified Boolean @default(true)
+  failedVerificationCount Int @default(0)
+  lockedUntil DateTime?
+  @@schema("portl_auth")
+}
+model AdminAssurance {
+  sessionId String @id
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@schema("portl_auth")
+}
+model AdminTotpUse {
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  digest String
+  expiresAt DateTime
+  @@id([userId, digest])
+  @@schema("portl_auth")
+}
+enum SocietyRole {
+  RESIDENT
+  GUARD
+  ADMIN
+  @@schema("portl_registry")
+}
+enum ResidentRelationship {
+  OWNER
+  TENANT
+  @@schema("portl_registry")
+}
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  @@schema("portl_registry")
+}
+model Society {
+  id String @id @default(uuid())
+  name String
+  joinCodeHash String @unique
+  isDemo Boolean @default(true)
+  archived Boolean @default(false)
+  towers Tower[]
+  flats Flat[]
+  memberships Membership[]
+  occupancies Occupancy[]
+  invitations Invitation[]
+  applications ResidentApplication[]
+  audits RegistryAudit[]
+  @@schema("portl_registry")
+}
+model Tower {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  name String
+  flats Flat[]
+  @@unique([societyId, id])
+  @@unique([societyId, name])
+  @@schema("portl_registry")
+}
+model Flat {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  towerId String
+  tower Tower @relation(fields: [societyId, towerId], references: [societyId, id])
+  label String
+  archived Boolean @default(false)
+  occupancies Occupancy[]
+  invitations Invitation[]
+  applications ResidentApplication[]
+  @@unique([societyId, id])
+  @@unique([societyId, towerId, label])
+  @@schema("portl_registry")
+}
+model Membership {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role SocietyRole
+  active Boolean @default(true)
+  @@unique([societyId, userId, role])
+  @@index([userId, active])
+  @@schema("portl_registry")
+}
+model Occupancy {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  flatId String
+  flat Flat @relation(fields: [societyId, flatId], references: [societyId, id])
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relationship ResidentRelationship
+  startedAt DateTime @default(now())
+  endedAt DateTime?
+  @@unique([societyId, flatId, userId])
+  @@index([userId, endedAt])
+  @@schema("portl_registry")
+}
+model Invitation {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  flatId String
+  flat Flat @relation(fields: [societyId, flatId], references: [societyId, id])
+  email String
+  relationship ResidentRelationship
+  tokenHash String @unique
+  createdBy String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  acceptedAt DateTime?
+  acceptedBy String?
+  revokedAt DateTime?
+  @@index([societyId, createdAt, id])
+  @@schema("portl_registry")
+}
+model ResidentApplication {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  flatId String
+  flat Flat @relation(fields: [societyId, flatId], references: [societyId, id])
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  relationship ResidentRelationship
+  status ApplicationStatus @default(PENDING)
+  reason String?
+  createdAt DateTime @default(now())
+  decidedAt DateTime?
+  decidedBy String?
+  @@index([societyId, status, createdAt, id])
+  @@index([userId, createdAt, id])
+  @@schema("portl_registry")
+}
+model RegistryAudit {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  actorId String
+  action String
+  resourceId String
+  requestId String
+  createdAt DateTime @default(now())
+  @@index([societyId, createdAt])
+  @@schema("portl_registry")
 }

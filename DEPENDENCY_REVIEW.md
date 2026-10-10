@@ -1,8 +1,8 @@
 # Dependency audit status
 
-Reviewed: 2026-10-10. Scope: Expo SDK 57, Express and the Prisma/Better Auth backend OTP slice.
+Reviewed: 2026-10-10. Scope: Expo SDK 57, Express, Prisma/Better Auth, resident onboarding and native component testing.
 
-`pnpm audit --audit-level=high` reports two high and two moderate advisories. The high findings are:
+`pnpm audit --audit-level=high` reports two high and three moderate advisories. The high findings are:
 
 | Advisory                                                                 | Dependency path in this lockfile                    | Upstream status                                             |
 | ------------------------------------------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------- |
@@ -12,6 +12,10 @@ Reviewed: 2026-10-10. Scope: Expo SDK 57, Express and the Prisma/Better Auth bac
 These paths are in the mobile build/development tooling. This is a dependency-path observation, not proof that every affected operation is unreachable. The application does not use these packages directly for visitor credentials, authentication or API requests. Expo's CLI and Metro must not be exposed as public production services. Builds must use trusted configuration and source inputs.
 
 No advisories are ignored, and the CI dependency-audit job fails while high findings remain. Recheck fixes before release automation. Local checks passing does not imply a clean security audit or a verified native release.
+
+The moderate findings are `uuid` (GHSA-w5hq-g745-h8pq), `decode-uri-component` (GHSA-vcc3-ghjq-m6fr), and `sprintf-js` (GHSA-hp3w-g68c-fv3c). The last finding was introduced by Jest's coverage tooling through `@istanbuljs/load-nyc-config → js-yaml → argparse → sprintf-js`; the registry currently lists no patched version. It is a development/test path, not an API runtime dependency. No unsupported override is applied to hide it. Reassess all five findings before release.
+
+The native test stack uses Expo-matched `jest-expo ~57.0.5`, Jest 29.7, React Native Testing Library 13.3.3 and `react-test-renderer` 19.2.3 matching React 19.2.3. Better Auth and its Expo plugin are both pinned to 1.7.7, with `@better-auth/utils` 0.4.2 matching Better Auth's declared range. Native dependencies were installed using Expo's version resolver. Server production output excludes integration fixtures and test files.
 
 ## Reviewed integration fixes
 

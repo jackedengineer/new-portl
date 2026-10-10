@@ -1,0 +1,16 @@
+{
+  "adminEmail": "operator@example.invalid",
+  "adminName": "Demo Society Admin",
+  "societies": [
+    {
+      "name": "Portl Gardens (Demo)",
+      "code": "DEMOA1B2C3D4",
+      "towers": [{ "name": "A", "flats": ["101", "102", "201", "202"] }]
+    },
+    {
+      "name": "Portl Courtyard (Demo)",
+      "code": "DEMOB1C2D3E4",
+      "towers": [{ "name": "East", "flats": ["101", "102"] }]
+    }
+  ]
+}
