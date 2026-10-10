@@ -16,3 +16,4 @@ coverage/
 .idea/
 apps/mobile/android/
 apps/mobile/ios/
+apps/server/src/generated/

@@ -3,5 +3,11 @@ packages:
   - packages/*
 
 onlyBuiltDependencies:
+  - '@prisma/engines'
   - esbuild
   - unrs-resolver
+
+# Reviewed security fixes; rationale and compatibility checks in DEPENDENCY_REVIEW.md.
+overrides:
+  'prisma@7.10.0>mysql2': 3.23.1
+  '@prisma/config@7.10.0>deepmerge-ts': 8.0.0

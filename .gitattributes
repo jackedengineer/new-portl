@@ -1,0 +1,2 @@
+# Preserve Prisma's generated migration bytes/checksums, including its terminal blank line.
+apps/server/prisma/migrations/**/*.sql whitespace=-blank-at-eof
