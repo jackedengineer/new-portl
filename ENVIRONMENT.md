@@ -2,7 +2,7 @@
 
 Use separate development, staging and production resources and secrets. Start with development only. Put local values in `apps/server/.env` and `apps/mobile/.env.local`; both are ignored by Git. Do not send secret values in chat. Railway will hold deployed server secrets; EAS will hold build credentials.
 
-## Needed for the next slice: email OTP and the database
+## Active: email OTP and the database
 
 | Variable              | Where it comes from                                               | Purpose                                                                |
 | --------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -12,7 +12,7 @@ Use separate development, staging and production resources and secrets. Start wi
 | `RESEND_API_KEY`      | Resend API keys; restrict to sending for the verified domain      | Deliver OTP messages from the server                                   |
 | `EMAIL_FROM`          | An address under your verified domain                             | Initial selection: `Portl <auth@jacked.dev>`                           |
 
-Database role provisioning and RLS will be implemented and verified with the database slice. A dashboard-provided owner connection must not become the production runtime connection. Do not run migrations against a production branch during local development.
+The development database now has the `portl_auth` schema and a separate runtime role. Provisioning grants CRUD on the six auth/throttle tables, without table/schema ownership, migration-history access, superuser, role/database creation or RLS bypass. Startup checks reject privileged roles. Domain tables and tenant RLS are not implemented yet. Do not run development migrations against production. Runtime Railway services must receive only `DATABASE_URL`; keep `DIRECT_DATABASE_URL` in a separate migration job/secret context.
 
 If the restricted runtime role does not exist yet, fill `DIRECT_DATABASE_URL` first. We can provision that role during database setup and then populate `DATABASE_URL`.
 
@@ -20,9 +20,19 @@ Better Auth creates and verifies OTPs and establishes sessions. Resend delivers 
 
 ## Configuration we supply
 
-`BETTER_AUTH_URL` is the backend base URL. `TRUSTED_ORIGINS` is the exact allowlist for auth requests, initially the `portl://` app scheme; local development and production allowlists will be separate. `EXPO_PUBLIC_API_URL` is the backend URL reachable from the device. None of these URLs is a secret. The current bootstrap reads only `NODE_ENV`, `HOST`, `PORT` and `LOG_LEVEL`; integration fields are reserved for the next slices and do not activate unfinished features.
+`BETTER_AUTH_URL` is the backend base URL. `TRUSTED_ORIGINS` is the exact auth allowlist, initially `portl://`; production accepts HTTPS web origins and the app scheme. `EXPO_PUBLIC_API_URL` is the device-reachable backend URL. These URLs are public configuration. Startup validates the active database, auth and email fields; missing configuration fails startup.
 
 For local URLs use `http://localhost:3000` on an iOS simulator, `http://10.0.2.2:3000` on the standard Android emulator, or the computer's LAN address on a physical device. Deployed URLs use HTTPS. Do not commit a development transport exception into release builds.
+
+## Auth behavior and deployment gates
+
+Only send-login-OTP, sign-in-with-OTP, get-session and sign-out are exposed under `/api/auth`. Codes have six digits, five-minute expiry, three verification attempts and HMAC-SHA256 storage keyed by the server secret. Sending is limited to once per email per 60 seconds and five per hour; IP budgets are three sends per minute and ten verification requests per ten minutes. Database-backed limits arbitrate concurrent API processes. Sessions expire after seven days and refresh at most daily; database revocation is checked without a cookie cache.
+
+Email sends are synchronous with a ten-second provider timeout. A provider acceptance is not a delivery confirmation. Delivery failure returns a safe 503 and removes the matching unused challenge. No queued plaintext OTP, password endpoint, universal test code or automatic role grant exists. Automated tests replace only the email transport.
+
+Express currently trusts the socket address and overwrites the internal auth IP header. Before deploying behind Railway, verify its ingress/proxy behavior and implement a constrained, tested proxy trust configuration. Otherwise requests can share one proxy IP and legitimate users can hit a shared limit. Never enable blanket trust of client forwarding headers. Auth/throttle expiry cleanup, account deletion, administrator step-up and native SecureStore integration remain release gates.
+
+The local integration runner reads ignored `.env` values without printing them and uses only synthetic test records. Prefer a separate Neon test branch. CI's published `portl-ci-only` password belongs to its disposable loopback database; it is not a deployment credential.
 
 ## Prepare later; not needed to start
 

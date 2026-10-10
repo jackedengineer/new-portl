@@ -6,3 +6,4 @@ coverage/
 expo-env.d.ts
 .env
 .env.*
+apps/server/src/generated/

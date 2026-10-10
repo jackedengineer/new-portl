@@ -2,17 +2,40 @@ import { pino } from 'pino';
 
 import { createApp } from './app.js';
 import { parseRuntimeEnv } from './config/env.js';
+import { parseAuthEnv } from './config/auth-env.js';
+import { assertRestrictedRuntime, createDatabase } from './database/client.js';
+import { createAuth } from './auth/auth.js';
+import { resendDelivery } from './auth/email.js';
 
 const env = parseRuntimeEnv(process.env);
 const logger = pino({ level: env.LOG_LEVEL, base: { service: 'portl-api' } });
-const server = createApp(logger).listen(env.PORT, env.HOST, () => {
+const authEnv = parseAuthEnv(process.env, env.NODE_ENV);
+const db = createDatabase(authEnv.DATABASE_URL);
+try {
+  await assertRestrictedRuntime(db);
+} catch {
+  logger.fatal('Database unavailable or runtime role is not restricted');
+  await db.$disconnect();
+  process.exit(1);
+}
+const auth = createAuth(
+  db,
+  authEnv,
+  resendDelivery(authEnv.RESEND_API_KEY, authEnv.EMAIL_FROM),
+);
+const server = createApp(logger, {
+  auth,
+  db,
+  baseURL: authEnv.BETTER_AUTH_URL,
+}).listen(env.PORT, env.HOST, () => {
   logger.info({ port: env.PORT }, 'API listening');
 });
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
-server.on('error', (error: NodeJS.ErrnoException) => {
+server.on('error', async (error: NodeJS.ErrnoException) => {
   logger.fatal({ code: error.code }, 'API server failed');
   process.exitCode = 1;
+  await db.$disconnect();
 });
 
 let shuttingDown = false;
@@ -25,9 +48,10 @@ function shutdown(signal: string) {
     process.exitCode = 1;
   }, 10_000);
   deadline.unref();
-  server.close((error) => {
+  server.close(async (error) => {
     clearTimeout(deadline);
     if (error) process.exitCode = 1;
+    await db.$disconnect();
   });
 }
 
