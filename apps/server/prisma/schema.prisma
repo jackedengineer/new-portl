@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["portl_auth", "portl_registry"]
+  schemas  = ["portl_auth", "portl_registry", "portl_gate"]
 }
 
 model User {
@@ -152,6 +152,8 @@ model Society {
   invitations Invitation[]
   applications ResidentApplication[]
   audits RegistryAudit[]
+  gates Gate[]
+  visitorRequests VisitorRequest[]
   @@schema("portl_registry")
 }
 model Tower {
@@ -175,6 +177,7 @@ model Flat {
   occupancies Occupancy[]
   invitations Invitation[]
   applications ResidentApplication[]
+  visitorRequests VisitorRequest[]
   @@unique([societyId, id])
   @@unique([societyId, towerId, label])
   @@schema("portl_registry")
@@ -202,6 +205,7 @@ model Occupancy {
   relationship ResidentRelationship
   startedAt DateTime @default(now())
   endedAt DateTime?
+  @@unique([societyId, id])
   @@unique([societyId, flatId, userId])
   @@index([userId, endedAt])
   @@schema("portl_registry")
@@ -254,4 +258,129 @@ model RegistryAudit {
   createdAt DateTime @default(now())
   @@index([societyId, createdAt])
   @@schema("portl_registry")
+}
+
+model Gate {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  name String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  assignments GuardAssignment[]
+  requests VisitorRequest[]
+  events MovementEvent[]
+  @@unique([societyId, id])
+  @@unique([societyId, name])
+  @@schema("portl_registry")
+}
+model GuardAssignment {
+  id String @id @default(uuid())
+  societyId String
+  gateId String
+  gate Gate @relation(fields: [societyId, gateId], references: [societyId, id])
+  userId String
+  active Boolean @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+  @@unique([societyId, gateId, userId])
+  @@index([societyId, userId, active])
+  @@schema("portl_registry")
+}
+enum VisitorCategory {
+  GUEST
+  DELIVERY
+  CAB
+  SERVICE
+  @@schema("portl_gate")
+}
+enum VisitorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  @@schema("portl_gate")
+}
+enum MovementType {
+  ENTRY
+  EXIT
+  @@schema("portl_gate")
+}
+model VisitorRequest {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  gateId String
+  gate Gate @relation(fields: [societyId, gateId], references: [societyId, id])
+  flatId String
+  flat Flat @relation(fields: [societyId, flatId], references: [societyId, id])
+  visitorName String
+  category VisitorCategory
+  company String?
+  status VisitorStatus @default(PENDING)
+  version Int @default(1)
+  createdBy String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  approvedUntil DateTime?
+  decidedBy String?
+  decidedAt DateTime?
+  recipients RequestRecipient[]
+  visit Visit?
+  @@unique([societyId, id])
+  @@index([societyId, createdAt, id])
+  @@index([societyId, status, expiresAt])
+  @@schema("portl_gate")
+}
+model RequestRecipient {
+  id String @id @default(uuid())
+  societyId String
+  requestId String
+  request VisitorRequest @relation(fields: [societyId, requestId], references: [societyId, id])
+  userId String
+  occupancyId String
+  occupancyStartedAt DateTime
+  createdAt DateTime @default(now())
+  @@unique([requestId, userId])
+  @@index([societyId, userId, requestId])
+  @@schema("portl_gate")
+}
+model Visit {
+  id String @id @default(uuid())
+  societyId String
+  requestId String @unique
+  request VisitorRequest @relation(fields: [societyId, requestId], references: [societyId, id])
+  enteredAt DateTime
+  enteredBy String
+  exitedAt DateTime?
+  exitedBy String?
+  events MovementEvent[]
+  @@unique([societyId, id])
+  @@unique([societyId, requestId])
+  @@schema("portl_gate")
+}
+model MovementEvent {
+  id String @id @default(uuid())
+  societyId String
+  visitId String
+  visit Visit @relation(fields: [societyId, visitId], references: [societyId, id])
+  type MovementType
+  gateId String
+  gate Gate @relation(fields: [societyId, gateId], references: [societyId, id])
+  actorId String
+  createdAt DateTime @default(now())
+  @@unique([visitId, type])
+  @@index([societyId, createdAt])
+  @@schema("portl_gate")
+}
+model GateCommandReceipt {
+  societyId String
+  actorId String
+  intentId String
+  inputHash String
+  requestId String
+  version Int
+  createdAt DateTime @default(now())
+  @@id([societyId, actorId, intentId])
+  @@schema("portl_gate")
 }

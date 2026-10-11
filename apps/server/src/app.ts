@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Logger } from 'pino';
 
+import { gateRouter } from './gate/router.js';
 import { registryRouter } from './registry/router.js';
 import { DomainError } from './registry/context.js';
 import { registryService } from './registry/service.js';
@@ -149,6 +150,10 @@ export function createApp(logger?: Logger, services?: AppServices) {
         adminAuthenticatorConfigured: !!authenticator?.verified,
       });
     });
+    app.use(
+      '/v1/societies/:societyId/gate',
+      gateRouter(services.auth, services.db),
+    );
     app.use('/v1', registryRouter(services.auth, services.db));
   }
 
