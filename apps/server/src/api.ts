@@ -1,3 +1,4 @@
+import { passCodes } from './gate/pass-codes.js';
 import { pino } from 'pino';
 
 import { createApp } from './app.js';
@@ -27,6 +28,7 @@ const server = createApp(logger, {
   auth,
   db,
   baseURL: authEnv.BETTER_AUTH_URL,
+  passCodes: passCodes(authEnv.BETTER_AUTH_SECRET),
 }).listen(env.PORT, env.HOST, () => {
   logger.info({ port: env.PORT }, 'API listening');
 });

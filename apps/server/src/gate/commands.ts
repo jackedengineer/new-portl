@@ -10,7 +10,6 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import {
   audit,
   DomainError,
-  hash,
   withActor,
   type Actor,
   type Tx,
@@ -18,6 +17,7 @@ import {
 import { missing, now, recipient, requireView } from './access.js';
 import { assertDecision, assertEntry, assertExit } from './state.js';
 
+import { executeGateCommand } from './intent.js';
 async function command(
   tx: Tx,
   actor: Actor,
@@ -26,37 +26,19 @@ async function command(
   payload: unknown,
   work: () => Promise<GateCommand>,
 ) {
-  // Serialize identical intents before observing the receipt. Unique PK is the final backstop.
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([sid, actor.userId, key])},0))`;
-  const where = {
-    societyId_actorId_intentId: {
-      societyId: sid,
-      actorId: actor.userId,
-      intentId: key,
+  const result = await executeGateCommand(
+    tx,
+    actor,
+    sid,
+    'REQUEST',
+    key,
+    payload,
+    async () => {
+      const value = await work();
+      return { resourceId: value.requestId, version: value.version };
     },
-  };
-  const inputHash = hash(JSON.stringify(payload));
-  const previous = await tx.gateCommandReceipt.findUnique({ where });
-  if (previous) {
-    if (previous.inputHash !== inputHash)
-      throw new DomainError(
-        409,
-        'INTENT_REUSED',
-        'This action identifier was used for different details',
-      );
-    return { requestId: previous.requestId, version: previous.version };
-  }
-  const result = await work();
-  await tx.gateCommandReceipt.create({
-    data: {
-      societyId: sid,
-      actorId: actor.userId,
-      intentId: key,
-      inputHash,
-      ...result,
-    },
-  });
-  return result;
+  );
+  return { requestId: result.resourceId, version: result.version };
 }
 export function gateCommands(db: PrismaClient) {
   return {

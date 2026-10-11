@@ -1,3 +1,4 @@
+import { passCodes } from '../gate/pass-codes.js';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -32,6 +33,7 @@ const app = createApp(undefined, {
   auth,
   db,
   baseURL: 'http://localhost:3000',
+  passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
 });
 type User = { id: string; email: string; cookie: string; sessionId: string };
 const users: User[] = [];

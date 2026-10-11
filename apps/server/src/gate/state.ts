@@ -47,7 +47,10 @@ export function assertEntry(
       'Resident approval is no longer valid. Register a new arrival.',
     );
 }
-export function assertExit(row: State, version: number) {
+export function assertExit(
+  row: Pick<State, 'version' | 'visit'>,
+  version: number,
+) {
   if (row.version !== version || !row.visit || row.visit.exitedAt)
     throw changed();
 }

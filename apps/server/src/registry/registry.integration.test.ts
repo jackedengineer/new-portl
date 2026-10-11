@@ -1,3 +1,4 @@
+import { passCodes } from '../gate/pass-codes.js';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { symmetricEncrypt } from 'better-auth/crypto';
 import request from 'supertest';
@@ -35,6 +36,7 @@ const app = createApp(undefined, {
   auth,
   db,
   baseURL: 'http://localhost:3000',
+  passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
 });
 const users: {
   id: string;
