@@ -1,3 +1,7 @@
+import {
+  enqueueNotifications,
+  withNotificationTransaction,
+} from '../notifications/jobs.js';
 import { randomUUID } from 'node:crypto';
 import type {
   GuestPassCreate,
@@ -6,12 +10,7 @@ import type {
   GuestPassRevoke,
 } from '@portl/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
-import {
-  audit,
-  DomainError,
-  withActor,
-  type Actor,
-} from '../registry/context.js';
+import { audit, DomainError, type Actor } from '../registry/context.js';
 import { now, requireView } from './access.js';
 import { isIssuer, lockFlat, lockIssuer, passMissing } from './pass-access.js';
 import type { PassCodes } from './pass-codes.js';
@@ -25,7 +24,7 @@ import { assertExit } from './state.js';
 export function passCommands(db: PrismaClient, codes: PassCodes) {
   return {
     create: (actor: Actor, sid: string, input: GuestPassCreate) =>
-      withActor(db, actor, async (tx) => {
+      withNotificationTransaction(db, actor, async (tx) => {
         await requireView(tx, actor, sid, 'RESIDENT');
         await lockFlat(tx, sid, input.flatId);
         const occupants = await tx.$queryRaw<
@@ -63,7 +62,7 @@ export function passCommands(db: PrismaClient, codes: PassCodes) {
       kind: 'revoke' | 'entry' | 'exit',
       input: GuestPassRevoke | GuestPassEntry | GuestPassExit,
     ) =>
-      withActor(db, actor, async (tx) => {
+      withNotificationTransaction(db, actor, async (tx) => {
         await requireView(
           tx,
           actor,
@@ -157,6 +156,14 @@ export function passCommands(db: PrismaClient, codes: PassCodes) {
                 'Invalid pass action',
               );
             await audit(tx, actor, sid, `GUEST_PASS_${kind.toUpperCase()}`, id);
+            if (kind !== 'revoke')
+              await enqueueNotifications(
+                db,
+                tx,
+                await tx.$queryRaw<
+                  { id: string }[]
+                >`SELECT * FROM portl_gate.notify_pass(${id})`,
+              );
             return { resourceId: id, version: row.version + 1 };
           },
         );

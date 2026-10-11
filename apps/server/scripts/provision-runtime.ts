@@ -1,3 +1,4 @@
+import { provisionWorker } from './provision-worker.js';
 import { randomBytes } from 'node:crypto';
 import { chmod, readFile, rename, writeFile } from 'node:fs/promises';
 
@@ -35,6 +36,7 @@ async function provision() {
       if (result.rows.length !== 1 || result.rows[0].unsafe)
         throw new Error('Unsafe runtime role');
       await grantRuntime(client, role);
+      await provisionWorker(client, direct);
       console.log('Restricted runtime grants updated; credentials unchanged.');
       return;
     }
@@ -66,6 +68,7 @@ async function provision() {
     await writeFile(`${path}.runtime.tmp`, next, { mode: 0o600, flag: 'wx' });
     await rename(`${path}.runtime.tmp`, path);
     await chmod(path, 0o600);
+    await provisionWorker(client, direct);
     console.log(
       'Restricted runtime role created; DATABASE_URL updated in the ignored local environment file.',
     );

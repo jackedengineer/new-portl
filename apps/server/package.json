@@ -14,7 +14,10 @@
     "db:generate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js generate",
     "db:migrate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate deploy",
     "db:provision": "tsx --env-file=.env scripts/provision-runtime.ts",
-    "db:bootstrap": "tsx --env-file-if-exists=.env scripts/bootstrap.ts"
+    "db:bootstrap": "tsx --env-file-if-exists=.env scripts/bootstrap.ts",
+    "db:jobs:init": "tsx --env-file-if-exists=.env scripts/init-jobs.ts",
+    "dev:worker": "tsx watch --env-file-if-exists=.env src/worker.ts",
+    "start:worker": "node --env-file-if-exists=.env dist/worker.js"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.7",
@@ -27,6 +30,7 @@
     "express": "5.3.0",
     "helmet": "8.3.0",
     "pg": "8.23.1",
+    "pg-boss": "12.35.0",
     "pino": "10.4.0",
     "resend": "6.32.1",
     "zod": "4.6.5"

@@ -57,6 +57,12 @@ Express currently trusts the socket address and overwrites the internal auth IP 
 
 The local integration runner reads ignored `.env` values without printing them and uses only synthetic test records. Prefer a separate Neon test branch. CI's published `portl-ci-only` password belongs to its disposable loopback database; it is not a deployment credential.
 
+## Notification worker
+
+Run `db:migrate`, then `pnpm --filter @portl/server db:jobs:init` using the migration owner, then `db:provision`. Development provisioning creates/reuses a separate restricted `WORKER_DATABASE_URL` alongside the API role and keeps credentials in ignored server env. Runtime queue migrations are disabled. `pnpm --filter @portl/server dev:worker` starts local delivery; after `pnpm build:server`, Railway uses a separate service running `pnpm --filter @portl/server start:worker`.
+
+The worker receives only `WORKER_DATABASE_URL` for database access, the same `BETTER_AUTH_SECRET` as the API for token encryption, optional worker-only `EXPO_ACCESS_TOKEN` if enhanced push security is enabled, `NODE_ENV` and `LOG_LEVEL`. It does not need Resend or `DIRECT_DATABASE_URL`. Do not give the API the worker role or migration owner. Production provisioning and key re-encryption/rotation require reviewed operator procedures. No Firebase/EAS project or native build is created by this backend increment; mobile setup follows separately.
+
 ## Prepare later; not needed to start
 
 | Integration            | Credentials / configuration                                                                                                                             | Storage                                                                           |

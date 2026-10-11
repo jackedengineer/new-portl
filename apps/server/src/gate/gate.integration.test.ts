@@ -1,3 +1,4 @@
+import { stopNotificationQueue } from '../notifications/jobs.js';
 import { passCodes } from '../gate/pass-codes.js';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
@@ -253,6 +254,7 @@ afterAll(async () => {
   await owner.user.deleteMany({
     where: { id: { in: users.map((u) => u.id) } },
   });
+  await stopNotificationQueue(db);
   await db.$disconnect();
   await owner.$disconnect();
 }, 60000);

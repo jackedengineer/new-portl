@@ -44,6 +44,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @portl/server db:migrate
+      - run: pnpm --filter @portl/server db:jobs:init
       - name: Prepare ephemeral CI runtime credentials
         working-directory: apps/server
         run: node --input-type=module -e 'import {writeFileSync} from "node:fs"; writeFileSync(".env", `DIRECT_DATABASE_URL=${process.env.DIRECT_DATABASE_URL}\nDATABASE_URL=${process.env.DIRECT_DATABASE_URL}\n`, {mode:0o600});'

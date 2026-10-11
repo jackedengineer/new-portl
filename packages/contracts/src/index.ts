@@ -106,3 +106,5 @@ export type ApplicationInput = z.infer<typeof applicationInput>;
 export type InvitationInput = z.infer<typeof invitationInput>;
 export type DecisionInput = z.infer<typeof decisionInput>;
 export * from './guest-passes.ts';
+
+export * from './notifications.ts';

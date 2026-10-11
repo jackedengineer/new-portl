@@ -10,11 +10,12 @@ Use Node 24 (the pinned development version is in `.node-version`) and pnpm 10.3
 pnpm install --frozen-lockfile
 pnpm --filter @portl/server db:generate
 pnpm --filter @portl/server db:migrate
+pnpm --filter @portl/server db:jobs:init
 pnpm --filter @portl/server db:provision
 pnpm dev:api
 ```
 
-First create the ignored environment files from their examples if they do not exist, and configure the development credentials described in [environment setup](ENVIRONMENT.md). Generate the Prisma client after installation. Migrations use the direct owner connection; provisioning creates a restricted runtime role and updates only the local `DATABASE_URL`. API startup rejects privileged runtime roles. Never run development migrations or integration tests against production.
+First create the ignored environment files from their examples if they do not exist, and configure the development credentials described in [environment setup](ENVIRONMENT.md). Generate the Prisma client after installation. Migrations use the direct owner connection; provisioning creates a restricted runtime role and updates the local `DATABASE_URL` and `WORKER_DATABASE_URL`. API startup rejects privileged runtime roles. Never run development migrations or integration tests against production.
 
 In another terminal:
 
@@ -43,7 +44,13 @@ Bootstrap refuses to replace an existing authenticator. Credential recovery and 
 
 After signing in, an assured admin can open **Gate access** under society administration, create a gate and assign a guard’s already verified email account. Assigned guards can register guest, delivery, cab and service arrivals for an active flat. Any current resident captured for that flat can approve or reject; the first decision wins. Guards separately confirm physical entry and exit. Residents and admins can view the relevant movement history.
 
-Pending arrivals expire after 10 minutes. Approval permits one entry within 30 minutes; it does not mark the visitor inside. The API rechecks the approving resident’s original occupancy before entry. Foreground screens refresh every 5 seconds; reconnect before taking action. Residents can also create scheduled guest passes for their own flat, reveal/share a 16-character code and revoke it before entry. Guards verify a presented code and separately confirm one entry and one exit; existing presence survives pass expiry. Codes never appear in history or URLs. Background push, QR scanning and manual overrides remain later slices.
+Pending arrivals expire after 10 minutes. Approval permits one entry within 30 minutes; it does not mark the visitor inside. The API rechecks the approving resident’s original occupancy before entry. Foreground screens refresh every 5 seconds; reconnect before taking action. Residents can also create scheduled guest passes for their own flat, reveal/share a 16-character code and revoke it before entry. Guards verify a presented code and separately confirm one entry and one exit; existing presence survives pass expiry. Codes never appear in history or URLs. Mobile push opt-in, QR scanning and manual overrides follow in later slices.
+
+## Notification backend
+
+Gate source changes now create private notification inbox rows and durable pg-boss jobs in the same transaction. Visitor requests target their current captured household; decisions target assigned guards; movement updates target original eligible residents or the guest-pass issuer. Authenticated `/v1/notifications` list/detail/read routes return minimal private DTOs; device registration/removal binds encrypted tokens to actual live sessions and installation generations.
+
+Run `pnpm --filter @portl/server dev:worker` separately after migration, `db:jobs:init` and `db:provision`. The API and worker use distinct restricted database roles. The worker retries transient errors, checks provider receipts and rechecks current authorization before sending generic Expo push. It cannot write auth/gate business tables. No real provider/device delivery is claimed. Mobile inbox/push opt-in and Android EAS/Firebase preparation follow in a dependent PR.
 
 ## Checks
 
@@ -61,4 +68,4 @@ Integration tests use real PostgreSQL and synthetic identities with a fake email
 
 GitHub Actions runs these checks on pushes to `main` and pull requests. A separate dependency-audit job reports upstream issues without hiding them; see [the current dependency review](DEPENDENCY_REVIEW.md). Deployment and store submission are not enabled by this workflow. Branch protection and required check settings must be configured before merging later feature pull requests.
 
-Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.7.0 (CHG-0008); specification editions are independent of app versions. Community modules, push, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.
+Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.8.0 (CHG-0009); specification editions are independent of app versions. Community modules, mobile notification UI, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.

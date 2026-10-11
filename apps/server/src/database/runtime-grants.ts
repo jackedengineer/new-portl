@@ -3,6 +3,25 @@ import pg from 'pg';
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
   await client.query(
+    `GRANT USAGE ON SCHEMA portl_notifications, portl_jobs TO ${who}`,
+  );
+  await client.query(
+    `GRANT SELECT ON portl_notifications."Notification" TO ${who}`,
+  );
+  await client.query(
+    `GRANT UPDATE ("readAt") ON portl_notifications."Notification" TO ${who}`,
+  );
+  await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_notifications.eligible(portl_notifications."Notification"), portl_notifications.register_device(text,text,text,text,text), portl_notifications.remove_device(text), portl_gate.notify_request(text), portl_gate.notify_pass(text) TO ${who}`,
+  );
+  await client.query(
+    `GRANT SELECT ON ALL TABLES IN SCHEMA portl_jobs TO ${who}`,
+  );
+  await client.query(
+    `GRANT INSERT ON portl_jobs.job, portl_jobs.job_common TO ${who}`,
+  );
+
+  await client.query(
     `GRANT USAGE ON SCHEMA portl_auth, portl_registry, portl_gate TO ${who}`,
   );
   for (const table of [

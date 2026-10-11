@@ -1,3 +1,7 @@
+import {
+  enqueueNotifications,
+  withNotificationTransaction,
+} from '../notifications/jobs.js';
 import { randomUUID } from 'node:crypto';
 import type {
   ArrivalInput,
@@ -10,7 +14,6 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import {
   audit,
   DomainError,
-  withActor,
   type Actor,
   type Tx,
 } from '../registry/context.js';
@@ -43,7 +46,7 @@ async function command(
 export function gateCommands(db: PrismaClient) {
   return {
     register: (actor: Actor, sid: string, input: ArrivalInput) =>
-      withActor(db, actor, async (tx) => {
+      withNotificationTransaction(db, actor, async (tx) => {
         await requireView(tx, actor, sid, 'GUARD', input.gateId);
         return command(
           tx,
@@ -96,6 +99,13 @@ export function gateCommands(db: PrismaClient) {
               })),
             });
             await audit(tx, actor, sid, 'VISITOR_REQUESTED', id);
+            await enqueueNotifications(
+              db,
+              tx,
+              await tx.$queryRaw<
+                { id: string }[]
+              >`SELECT * FROM portl_gate.notify_request(${id})`,
+            );
             return { requestId: id, version: 1 };
           },
         );
@@ -107,7 +117,7 @@ export function gateCommands(db: PrismaClient) {
       kind: 'decision' | 'cancel' | 'entry' | 'exit',
       input: GateDecisionInput | GateCancelInput | MovementInput,
     ) =>
-      withActor(db, actor, async (tx) => {
+      withNotificationTransaction(db, actor, async (tx) => {
         await requireView(
           tx,
           actor,
@@ -231,6 +241,13 @@ export function gateCommands(db: PrismaClient) {
               });
             }
             await audit(tx, actor, sid, `VISITOR_${kind.toUpperCase()}`, id);
+            await enqueueNotifications(
+              db,
+              tx,
+              await tx.$queryRaw<
+                { id: string }[]
+              >`SELECT * FROM portl_gate.notify_request(${id})`,
+            );
             return { requestId: id, version: row.version + 1 };
           },
         );

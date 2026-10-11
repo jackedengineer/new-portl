@@ -1,3 +1,5 @@
+import { notificationRouter } from './notifications/router.js';
+import type { TokenCipher } from './notifications/tokens.js';
 import { randomUUID } from 'node:crypto';
 
 import express from 'express';
@@ -20,6 +22,7 @@ type AppServices = {
   db: PrismaClient;
   baseURL: string;
   passCodes: PassCodes;
+  tokenCipher?: TokenCipher;
 };
 
 export function createApp(logger?: Logger, services?: AppServices) {
@@ -52,7 +55,10 @@ export function createApp(logger?: Logger, services?: AppServices) {
         res.vary('Origin');
         if (req.method === 'OPTIONS') {
           res.setHeader('access-control-allow-methods', 'GET, POST');
-          res.setHeader('access-control-allow-headers', 'content-type');
+          res.setHeader(
+            'access-control-allow-headers',
+            'content-type,x-portl-expected-user',
+          );
           res.sendStatus(204);
           return;
         }
@@ -160,6 +166,10 @@ export function createApp(logger?: Logger, services?: AppServices) {
     app.use(
       '/v1/societies/:societyId/gate',
       gateRouter(services.auth, services.db, services.passCodes),
+    );
+    app.use(
+      '/v1/notifications',
+      notificationRouter(services.auth, services.db, services.tokenCipher),
     );
     app.use('/v1', registryRouter(services.auth, services.db));
   }
