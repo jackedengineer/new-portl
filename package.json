@@ -9,9 +9,11 @@
   "scripts": {
     "dev:api": "pnpm build:contracts && pnpm --filter @portl/server dev:api",
     "dev:mobile": "pnpm build:contracts && pnpm --filter @portl/mobile start",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm build:contracts && pnpm -r typecheck",
-    "test": "pnpm build:contracts && pnpm --filter @portl/server test --run && pnpm --filter @portl/mobile test",
+    "lint": "eslint scripts/security && pnpm -r lint",
+    "typecheck": "tsc -p tsconfig.security.json && pnpm build:contracts && pnpm -r typecheck",
+    "test:security": "node --test scripts/security/*.test.mts",
+    "security:audit": "node scripts/security/audit.mts",
+    "test": "pnpm test:security && pnpm build:contracts && pnpm --filter @portl/server test --run && pnpm --filter @portl/mobile test",
     "build:server": "pnpm build:contracts && pnpm --filter @portl/server build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
     "eslint": "10.12.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "prettier": "3.9.10",
