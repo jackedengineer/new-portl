@@ -2,7 +2,7 @@ import { passCodes } from '../gate/pass-codes.js';
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../app.js';
 import { assertRestrictedRuntime, createDatabase } from '../database/client.js';
@@ -26,7 +26,7 @@ const auth = createAuth(
     DATABASE_URL: databaseUrl,
     BETTER_AUTH_SECRET: 'portl-test-only-secret-with-at-least-32-characters',
     BETTER_AUTH_URL: 'http://localhost:3000',
-    TRUSTED_ORIGINS: ['portl://'],
+    TRUSTED_ORIGINS: ['portl://', 'exp://192.168.0.100:8081'],
     RESEND_API_KEY: 'unused-fake-boundary',
     EMAIL_FROM: 'Portl <auth@example.com>',
   },
@@ -83,6 +83,9 @@ async function issue(email: string) {
 
 beforeAll(async () => {
   await assertRestrictedRuntime(db);
+});
+beforeEach(async () => {
+  // Express fixtures share a loopback IP; each test needs its own send budget.
   await db.rateLimit.deleteMany({
     where: {
       key: {
@@ -312,7 +315,45 @@ describe('email OTP with PostgreSQL', () => {
     ).toBe(429);
   });
 
-  it('forwards sign-in cookies through Express and authenticates the next request', async () => {
+  it.each(['portl://', 'exp://192.168.0.100:8081'])(
+    'forwards native sign-in cookies for %s and authenticates the next request',
+    async (origin) => {
+      const app = createApp(undefined, {
+        auth,
+        db,
+        baseURL: 'http://localhost:3000',
+        passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
+      });
+      const email = identity();
+      const issued = await request(app)
+        .post('/api/auth/email-otp/send-verification-otp')
+        .set('expo-origin', origin)
+        .send({ email, type: 'sign-in' });
+      expect(issued.status).toBe(200);
+      const signedIn = await request(app)
+        .post('/api/auth/sign-in/email-otp')
+        .set('expo-origin', origin)
+        .send({ email, otp: sent.get(email) });
+      expect(signedIn.status).toBe(200);
+      const cookies = signedIn.headers['set-cookie'] as unknown as string[];
+      expect(
+        cookies.some(
+          (cookie) =>
+            cookie.includes('HttpOnly') && cookie.includes('SameSite=Lax'),
+        ),
+      ).toBe(true);
+      const profile = await request(app)
+        .get('/v1/me')
+        .set(
+          'cookie',
+          cookies.map((cookie) => cookie.split(';')[0]).join('; '),
+        );
+      expect(profile.status).toBe(200);
+      expect(profile.body.user.email).toBe(email);
+    },
+  );
+
+  it('rejects an Expo Go host absent from the exact allowlist', async () => {
     const app = createApp(undefined, {
       auth,
       db,
@@ -320,28 +361,12 @@ describe('email OTP with PostgreSQL', () => {
       passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
     });
     const email = identity();
-    const issued = await request(app)
+    const response = await request(app)
       .post('/api/auth/email-otp/send-verification-otp')
-      .set('origin', 'portl://')
+      .set('expo-origin', 'exp://192.168.0.101:8081')
       .send({ email, type: 'sign-in' });
-    expect(issued.status).toBe(200);
-    const signedIn = await request(app)
-      .post('/api/auth/sign-in/email-otp')
-      .set('origin', 'portl://')
-      .send({ email, otp: sent.get(email) });
-    expect(signedIn.status).toBe(200);
-    const cookies = signedIn.headers['set-cookie'] as unknown as string[];
-    expect(
-      cookies.some(
-        (cookie) =>
-          cookie.includes('HttpOnly') && cookie.includes('SameSite=Lax'),
-      ),
-    ).toBe(true);
-    const profile = await request(app)
-      .get('/v1/me')
-      .set('cookie', cookies.map((cookie) => cookie.split(';')[0]).join('; '));
-    expect(profile.status).toBe(200);
-    expect(profile.body.user.email).toBe(email);
+    expect(response.status).toBe(403);
+    expect(sent.has(email)).toBe(false);
   });
 
   it('rejects untrusted origins, malformed JSON and oversized bodies at the Express boundary', async () => {
