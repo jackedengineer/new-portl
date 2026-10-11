@@ -1,3 +1,4 @@
+import { passCodes } from '../gate/pass-codes.js';
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -316,6 +317,7 @@ describe('email OTP with PostgreSQL', () => {
       auth,
       db,
       baseURL: 'http://localhost:3000',
+      passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
     });
     const email = identity();
     const issued = await request(app)
@@ -347,6 +349,7 @@ describe('email OTP with PostgreSQL', () => {
       auth,
       db,
       baseURL: 'http://localhost:3000',
+      passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
     });
     const path = '/api/auth/email-otp/send-verification-otp';
     const hostile = await request(app)
@@ -376,6 +379,7 @@ describe('email OTP with PostgreSQL', () => {
       auth,
       db,
       baseURL: 'http://localhost:3000',
+      passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
     });
     // Remove only the loopback bucket this local HTTP fixture owns.
     await db.rateLimit.deleteMany({
@@ -416,6 +420,7 @@ describe('email OTP with PostgreSQL', () => {
       auth,
       db,
       baseURL: 'http://localhost:3000',
+      passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
     });
     expect((await request(app).get('/v1/me')).status).toBe(401);
     const profile = await request(app).get('/v1/me').set('cookie', cookie);

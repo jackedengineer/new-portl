@@ -1,6 +1,12 @@
 import express from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import {
+  guestPassCreateInput,
+  guestPassEntryInput,
+  guestPassExitInput,
+  guestPassRevokeInput,
+  guestPassVerifyInput,
+  guestPassListQuery,
   arrivalInput,
   gateCancelInput,
   gateDecisionInput,
@@ -19,11 +25,20 @@ import { DomainError, type Actor } from '../registry/context.js';
 import { gateAdmin } from './admin.js';
 import { gateCommands } from './commands.js';
 import { gateQueries } from './queries.js';
-export function gateRouter(auth: PortlAuth, db: PrismaClient) {
+import type { PassCodes } from './pass-codes.js';
+import { passCommands } from './pass-commands.js';
+import { passQueries } from './pass-queries.js';
+export function gateRouter(
+  auth: PortlAuth,
+  db: PrismaClient,
+  codes: PassCodes,
+) {
   const router = express.Router({ mergeParams: true });
   const commands = gateCommands(db),
     queries = gateQueries(db),
     admin = gateAdmin(db);
+  const passes = passCommands(db, codes),
+    passReads = passQueries(db, codes);
   const parse = <T>(schema: z.ZodType<T>, value: unknown) => {
     const result = schema.safeParse(value);
     if (!result.success)
@@ -80,6 +95,78 @@ export function gateRouter(auth: PortlAuth, db: PrismaClient) {
     next();
   });
   router.use(express.json({ limit: '8kb' }));
+  router.get('/passes/setup', async (req, res) =>
+    res.json(await passReads.setup(actor(res), sid(req))),
+  );
+  router.get('/passes', async (req, res) => {
+    const q = parse(guestPassListQuery, req.query);
+    res.json(
+      await passReads.list(actor(res), sid(req), q.view, q.filter, q.cursor),
+    );
+  });
+  router.post('/passes/verify', async (req, res) => {
+    const input = parse(guestPassVerifyInput, req.body);
+    if (!(await auth.budget(actor(res).userId, 'guest-pass-verify', 10, 60)))
+      throw new DomainError(
+        429,
+        'RATE_LIMITED',
+        'Please wait before verifying another pass',
+      );
+    res.json(
+      await passReads.verify(actor(res), sid(req), input.gateId, input.code),
+    );
+  });
+  router.get('/passes/:id', async (req, res) => {
+    const q = parse(z.strictObject({ view: gateView }), req.query);
+    res.json(await passReads.detail(actor(res), sid(req), id(req), q.view));
+  });
+  router.post('/passes', async (req, res) => {
+    const input = parse(guestPassCreateInput, req.body);
+    if (!(await auth.budget(actor(res).userId, 'guest-pass-create', 10, 60)))
+      throw new DomainError(
+        429,
+        'RATE_LIMITED',
+        'Please wait before creating another pass',
+      );
+    res.status(201).json(await passes.create(actor(res), sid(req), input));
+  });
+  router.post('/passes/:id/code', async (req, res) => {
+    parse(z.strictObject({}), req.body);
+    res.json(await passReads.reveal(actor(res), sid(req), id(req)));
+  });
+  router.post('/passes/:id/revoke', async (req, res) =>
+    res.json(
+      await passes.act(
+        actor(res),
+        sid(req),
+        id(req),
+        'revoke',
+        parse(guestPassRevokeInput, req.body),
+      ),
+    ),
+  );
+  router.post('/passes/:id/entry', async (req, res) =>
+    res.json(
+      await passes.act(
+        actor(res),
+        sid(req),
+        id(req),
+        'entry',
+        parse(guestPassEntryInput, req.body),
+      ),
+    ),
+  );
+  router.post('/passes/:id/exit', async (req, res) =>
+    res.json(
+      await passes.act(
+        actor(res),
+        sid(req),
+        id(req),
+        'exit',
+        parse(guestPassExitInput, req.body),
+      ),
+    ),
+  );
   router.get('/setup', async (req, res) => {
     const q = parse(gateSetupQuery, req.query);
     res.json(await queries.setup(actor(res), sid(req), q.view, q.search));

@@ -65,6 +65,7 @@ export async function grantRuntime(client: pg.Client, role: string) {
     );
   }
   for (const table of [
+    'GuestPass',
     'VisitorRequest',
     'RequestRecipient',
     'Visit',
@@ -75,6 +76,12 @@ export async function grantRuntime(client: pg.Client, role: string) {
       `GRANT SELECT, INSERT ON portl_gate.${pg.escapeIdentifier(table)} TO ${who}`,
     );
   }
+  await client.query(
+    `GRANT UPDATE (version, "revokedAt") ON portl_gate."GuestPass" TO ${who}`,
+  );
+  await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_gate.is_pass_issuer(text,text), portl_gate.pass_issuer_current(text,text), portl_gate.check_pass_change() TO ${who}`,
+  );
   await client.query(
     `GRANT UPDATE (status, version, "approvedUntil", "decidedBy", "decidedAt") ON portl_gate."VisitorRequest" TO ${who}`,
   );

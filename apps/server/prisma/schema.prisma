@@ -153,6 +153,7 @@ model Society {
   applications ResidentApplication[]
   audits RegistryAudit[]
   gates Gate[]
+  guestPasses GuestPass[]
   visitorRequests VisitorRequest[]
   @@schema("portl_registry")
 }
@@ -177,6 +178,7 @@ model Flat {
   occupancies Occupancy[]
   invitations Invitation[]
   applications ResidentApplication[]
+  guestPasses GuestPass[]
   visitorRequests VisitorRequest[]
   @@unique([societyId, id])
   @@unique([societyId, towerId, label])
@@ -202,6 +204,7 @@ model Occupancy {
   flat Flat @relation(fields: [societyId, flatId], references: [societyId, id])
   userId String
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestPasses GuestPass[]
   relationship ResidentRelationship
   startedAt DateTime @default(now())
   endedAt DateTime?
@@ -348,8 +351,10 @@ model RequestRecipient {
 model Visit {
   id String @id @default(uuid())
   societyId String
-  requestId String @unique
-  request VisitorRequest @relation(fields: [societyId, requestId], references: [societyId, id])
+  passId String? @unique
+  pass GuestPass? @relation(fields: [societyId, passId], references: [societyId, id])
+  requestId String? @unique
+  request VisitorRequest? @relation(fields: [societyId, requestId], references: [societyId, id])
   enteredAt DateTime
   enteredBy String
   exitedAt DateTime?
@@ -357,6 +362,7 @@ model Visit {
   events MovementEvent[]
   @@unique([societyId, id])
   @@unique([societyId, requestId])
+  @@unique([societyId, passId])
   @@schema("portl_gate")
 }
 model MovementEvent {
@@ -378,9 +384,35 @@ model GateCommandReceipt {
   actorId String
   intentId String
   inputHash String
-  requestId String
+  resourceId String
+  resourceKind String @default("REQUEST")
   version Int
   createdAt DateTime @default(now())
   @@id([societyId, actorId, intentId])
+  @@schema("portl_gate")
+}
+
+model GuestPass {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  flatId String
+  flat Flat @relation(fields: [societyId, flatId], references: [societyId, id])
+  issuerId String
+  occupancyId String
+  occupancy Occupancy @relation(fields: [societyId, occupancyId], references: [societyId, id])
+  occupancyStartedAt DateTime
+  visitorName String
+  tokenHash String @unique
+  cipherText String
+  createdAt DateTime @default(now())
+  validFrom DateTime
+  validUntil DateTime
+  revokedAt DateTime?
+  version Int @default(1)
+  visit Visit?
+  @@unique([societyId, id])
+  @@index([societyId, createdAt, id])
+  @@index([societyId, issuerId, validUntil])
   @@schema("portl_gate")
 }

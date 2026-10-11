@@ -13,7 +13,14 @@ import { registryService } from './registry/service.js';
 import { authRoutes, type PortlAuth } from './auth/auth.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 
-type AppServices = { auth: PortlAuth; db: PrismaClient; baseURL: string };
+import type { PassCodes } from './gate/pass-codes.js';
+
+type AppServices = {
+  auth: PortlAuth;
+  db: PrismaClient;
+  baseURL: string;
+  passCodes: PassCodes;
+};
 
 export function createApp(logger?: Logger, services?: AppServices) {
   const app = express();
@@ -152,7 +159,7 @@ export function createApp(logger?: Logger, services?: AppServices) {
     });
     app.use(
       '/v1/societies/:societyId/gate',
-      gateRouter(services.auth, services.db),
+      gateRouter(services.auth, services.db, services.passCodes),
     );
     app.use('/v1', registryRouter(services.auth, services.db));
   }
