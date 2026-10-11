@@ -1,0 +1,33 @@
+{
+  "reviewedOn": "2026-10-11",
+  "expiresAt": "2026-11-10T18:30:00.000Z",
+  "patches": [
+    {
+      "name": "node-forge",
+      "version": "1.4.0",
+      "ghsa": "GHSA-86w9-cpqp-85rv",
+      "patch": "patches/node-forge@1.4.0.patch",
+      "sha256": "7a9ddf51449fc10d9b288986960b5bc7d5bf121ca7e504013a867b8bda5315c9",
+      "files": {
+        "lib/rsa.js": "8a14e3fdb3aacecd4e943efc0c43cc3842ca1675b329d6641ee0a99923144598",
+        "dist/forge.min.js": "6d05dc1d30268e46dc65847ae92cad18fecb04958c92998b81cd7c74867a286a",
+        "dist/forge.all.min.js": "edfd90f84e1d16f16c53dffabe14044caa7fc7a497f86eabd80e871f35208d17"
+      }
+    },
+    {
+      "name": "braces",
+      "version": "3.0.3",
+      "ghsa": "GHSA-vfj7-8cjw-p6xm",
+      "patch": "patches/braces@3.0.3.patch",
+      "sha256": "1c134f609e28cf87c881d3ec3b447303f13d0b73902208022992f50c1ee650c0",
+      "files": {
+        "lib/assert-depth.js": "8a8f0cc459df39663324ece32696d0d1a7571d9bcae7a93366ee335d709d78c0",
+        "lib/constants.js": "c355cf54c07a89fd204eb08b747e27227e9a3522155885b45692455d9ac75f50",
+        "lib/parse.js": "6f706500bb904ebb1c103b13b7973ed1f5d08d3b74d7896ee544fa6d000b0ab3",
+        "lib/compile.js": "d10aed0075157ad51fd73dac482de1b2e7385deb432fd1d9d9eac2312d63f345",
+        "lib/expand.js": "ae269946b549657a9c0205dace6d2af36ef0709cd4f7d03bbfae7a79420806ac",
+        "lib/stringify.js": "861d8a84b69760aef0b21727b9ee3c3e08dfefafc0d45b5ac6c73fc550508b4d"
+      }
+    }
+  ]
+}

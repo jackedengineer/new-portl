@@ -1,2 +1,4 @@
 # Preserve Prisma's generated migration bytes/checksums, including its terminal blank line.
 apps/server/prisma/migrations/**/*.sql whitespace=-blank-at-eof
+# Unified diff context lines retain their required single-space prefix.
+patches/*.patch text eol=lf whitespace=-blank-at-eol
