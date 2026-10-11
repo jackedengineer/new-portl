@@ -24,6 +24,27 @@ Better Auth creates and verifies OTPs and establishes sessions. Resend delivers 
 
 For local URLs use `http://localhost:3000` on an iOS simulator, `http://10.0.2.2:3000` on the standard Android emulator, or the computer's LAN address on a physical device. Deployed URLs use HTTPS. Do not commit a development transport exception into release builds.
 
+## Physical iPhone testing with Expo Go
+
+Connect the Mac and iPhone to the same Wi-Fi network. Use `ipconfig getifaddr en0` to find the Mac's Wi-Fi address (adjust the interface if Wi-Fi is not `en0`). In the ignored environment files, replace `<LAN_IP>` with that address:
+
+```dotenv
+# apps/server/.env
+NODE_ENV=development
+HOST=0.0.0.0
+BETTER_AUTH_URL=http://<LAN_IP>:3000
+TRUSTED_ORIGINS=portl://,exp://<LAN_IP>:8081
+
+# apps/mobile/.env.local
+EXPO_PUBLIC_API_URL=http://<LAN_IP>:3000
+```
+
+Keep the existing database, auth secret and email credentials. Expo Go's Better Auth client sends its `exp://` origin; the API accepts only explicitly listed origins, with no wildcard matching. Exact Expo Go origins are permitted only in development. Test and production configuration reject them. The installed app continues to use `portl://`. Update the exact allowlist if Metro's address or port changes.
+
+Run `pnpm dev:api` and, in a second terminal, `pnpm --filter @portl/mobile exec expo start --go --lan --port 8081`. Restart both after changing their environment files. Update Expo Go to an SDK 57 compatible version and sign in using the same Expo account shown by `pnpm --filter @portl/mobile exec expo whoami`. Scan Metro's QR with the iPhone Camera and allow Expo Go Local Network access if prompted. Keep the Mac awake and both processes running. `http://<LAN_IP>:3000/health/ready` in iPhone Safari checks API connectivity before login.
+
+Expo Go downloads the development JavaScript bundle; it does not install a Portl `.ipa` or verify signed release behavior. A Metro tunnel would not also tunnel the local API. Signed development builds, push and release verification remain separate work. There is no public role selector: a new email starts onboarding, and role workflows require actual invitation/approval or controlled demo provisioning. See the README's first-administrator bootstrap procedure.
+
 ## Auth behavior and deployment gates
 
 Only send-login-OTP, sign-in-with-OTP, get-session, sign-out and authenticator verification are exposed under `/api/auth`. Codes have six digits, five-minute expiry, three verification attempts and HMAC-SHA256 storage keyed by the server secret. Sending is limited to once per email per 60 seconds and five per hour; IP budgets are three sends per minute and ten verification requests per ten minutes. Database-backed limits arbitrate concurrent API processes. Sessions expire after seven days and refresh at most daily; database revocation is checked without a cookie cache. Native cookies are stored through Better Auth's Expo client in SecureStore with `WHEN_UNLOCKED_THIS_DEVICE_ONLY`; the application query cache is memory-only and cleared between identities.

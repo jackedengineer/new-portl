@@ -1,5 +1,19 @@
 import { z } from 'zod';
 
+function isExpoGoOrigin(value: string) {
+  if (!/^exp:\/\/[^\s/\\?#]+$/.test(value) || !URL.canParse(value))
+    return false;
+  const url = new URL(value);
+  return (
+    !!url.hostname &&
+    !url.username &&
+    !url.password &&
+    !url.pathname &&
+    !url.search &&
+    !url.hash
+  );
+}
+
 const authEnvSchema = z.object({
   DATABASE_URL: z.url().refine((value) => /^postgres(?:ql)?:\/\//.test(value)),
   BETTER_AUTH_SECRET: z.string().min(32),
@@ -24,7 +38,8 @@ const authEnvSchema = z.object({
         (value) =>
           value.length > 0 &&
           !value.includes('*') &&
-          /^(https?:\/\/[^\s/]+|portl:\/\/)$/.test(value),
+          (/^(https?:\/\/[^\s/]+|portl:\/\/)$/.test(value) ||
+            isExpoGoOrigin(value)),
       ),
     ),
   RESEND_API_KEY: z.string().min(1),
@@ -45,6 +60,12 @@ export function parseAuthEnv(
     throw new Error(
       `Invalid authentication environment: ${result.error.issues.map((issue) => issue.path.join('.')).join(', ')}`,
     );
+  }
+  if (
+    mode !== 'development' &&
+    result.data.TRUSTED_ORIGINS.some((origin) => origin.startsWith('exp://'))
+  ) {
+    throw new Error('Invalid authentication environment: TRUSTED_ORIGINS');
   }
   if (
     mode === 'production' &&
