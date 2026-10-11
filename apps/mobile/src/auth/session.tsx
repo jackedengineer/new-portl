@@ -1,3 +1,4 @@
+import { clearPushState } from '../features/notifications/native';
 import {
   createContext,
   useContext,
@@ -118,6 +119,7 @@ function Session({ children }: { children: ReactNode }) {
     });
     client.getMutationCache().clear();
     client.setQueryData(['identity'], null);
+    await clearPushState().catch(() => {});
   }
   return (
     <Context.Provider
