@@ -65,6 +65,28 @@ export function VisitorQueue({
           }
         />
       )}
+      <Button
+        label="Guest passes"
+        variant="secondary"
+        onPress={() =>
+          router.push({
+            pathname: '/guest-passes',
+            params: { societyId, view },
+          })
+        }
+      />
+      {view === 'GUARD' && (
+        <Button
+          label="Verify guest pass"
+          variant="secondary"
+          onPress={() =>
+            router.push({
+              pathname: '/verify-guest-pass',
+              params: { societyId },
+            })
+          }
+        />
+      )}
       <Row>
         {(Object.keys(filters) as GateFilter[]).map((key) => (
           <Button
