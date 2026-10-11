@@ -19,6 +19,7 @@ export async function api<T>(
   schema: z.ZodType<T>,
   body?: unknown,
   signal?: AbortSignal,
+  expectedUserId?: string,
 ): Promise<T> {
   const controller = new AbortController();
   const cancel = () => controller.abort();
@@ -33,6 +34,7 @@ export async function api<T>(
       signal: controller.signal,
       headers: {
         accept: 'application/json',
+        ...(expectedUserId ? { 'x-portl-expected-user': expectedUserId } : {}),
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         ...(Platform.OS === 'web'
           ? {}

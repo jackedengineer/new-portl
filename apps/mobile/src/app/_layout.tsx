@@ -1,3 +1,4 @@
+import { NotificationBridge } from '../features/notifications/bridge';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -32,6 +33,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <SessionProvider>
+        <NotificationBridge />
         <Routes />
       </SessionProvider>
     </SafeAreaProvider>

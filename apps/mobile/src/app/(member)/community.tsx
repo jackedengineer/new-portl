@@ -64,6 +64,11 @@ export default function Community() {
         {me.memberships.length ? 'Welcome home.' : 'Let’s find your community.'}
       </Title>
       <Copy>Signed in as {me.user.email}</Copy>
+      <Button
+        label="Notifications"
+        variant="secondary"
+        onPress={() => router.push('/notifications')}
+      />
       {me.memberships.map((member) => (
         <Card key={member.society.id}>
           <Row>
