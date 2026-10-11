@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { idSchema } from '@portl/contracts';
 import { useSession } from '../../auth/session';
+import { AdminGates } from '../../features/gate/admin-gates';
 import { AdminStepUp } from '../../features/onboarding/admin-step-up';
 import { AdminReviews } from '../../features/onboarding/admin-reviews';
 import { AdminInvitations } from '../../features/onboarding/admin-invitations';
@@ -10,7 +11,9 @@ import { Badge, Button, Copy, Row, Screen, Title } from '../../components/ui';
 export default function Admin() {
   const { societyId } = useLocalSearchParams<{ societyId: string }>();
   const { me } = useSession();
-  const [tab, setTab] = useState<'reviews' | 'invitations'>('reviews');
+  const [tab, setTab] = useState<'reviews' | 'invitations' | 'gates'>(
+    'reviews',
+  );
   const parsed = idSchema.safeParse(societyId);
   const member = me?.memberships.find(
     (m) =>
@@ -38,8 +41,15 @@ export default function Admin() {
           variant={tab === 'invitations' ? 'primary' : 'secondary'}
           onPress={() => setTab('invitations')}
         />
+        <Button
+          label="Gate access"
+          variant={tab === 'gates' ? 'primary' : 'secondary'}
+          onPress={() => setTab('gates')}
+        />
       </Row>
-      {tab === 'reviews' ? (
+      {tab === 'gates' ? (
+        <AdminGates userId={me.user.id} societyId={member.society.id} />
+      ) : tab === 'reviews' ? (
         <AdminReviews userId={me.user.id} societyId={member.society.id} />
       ) : (
         <AdminInvitations

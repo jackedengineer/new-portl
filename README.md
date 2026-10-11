@@ -1,6 +1,6 @@
 # Portl
 
-An Expo / React Native society management app with a TypeScript / Express backend. This slice implements email OTP login, email-bound resident invitations, resident applications and administrator review across independent societies. Society authority is granted only by a valid invitation or an admin approval.
+An Expo / React Native society management app with a TypeScript / Express backend. Implemented slices include email OTP login, resident admission, guard visitor registration, resident decisions and distinct entry/exit history across independent societies. Society authority is granted only by a valid invitation or an admin approval.
 
 ## Local development
 
@@ -37,6 +37,12 @@ There is no public endpoint for creating societies or granting admin roles. Use 
 
 Bootstrap refuses to replace an existing authenticator. Credential recovery and production society provisioning require a separate operator procedure before a public launch. Invitations are shared manually using the device share sheet; only OTPs are delivered through Resend. Invitation codes are shown once, email-bound, single-use and expire after seven days. Multiple verified household members can share a flat; `OWNER`/`TENANT` is the recorded residency relationship, not proof of legal ownership.
 
+## Visitor operations
+
+After signing in, an assured admin can open **Gate access** under society administration, create a gate and assign a guard’s already verified email account. Assigned guards can register guest, delivery, cab and service arrivals for an active flat. Any current resident captured for that flat can approve or reject; the first decision wins. Guards separately confirm physical entry and exit. Residents and admins can view the relevant movement history.
+
+Pending arrivals expire after 10 minutes. Approval permits one entry within 30 minutes; it does not mark the visitor inside. The API rechecks the approving resident’s original occupancy before entry. Foreground screens refresh every 5 seconds; reconnect before taking action. Background push notifications, guest pre-approval passes and manual overrides remain later slices.
+
 ## Checks
 
 ```sh
@@ -53,4 +59,4 @@ Integration tests use real PostgreSQL and synthetic identities with a fake email
 
 GitHub Actions runs these checks on pushes to `main` and pull requests. A separate dependency-audit job reports upstream issues without hiding them; see [the current dependency review](DEPENDENCY_REVIEW.md). Deployment and store submission are not enabled by this workflow. Branch protection and required check settings must be configured before merging later feature pull requests.
 
-Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.3.0 (CHG-0004); specification editions are independent of app versions. Visitor operations, community modules, push, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device and Railway proxy configuration gates.
+Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.5.0 (CHG-0006); specification editions are independent of app versions. Guest pre-approval, community modules, push, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device and Railway proxy configuration gates.

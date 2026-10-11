@@ -1,16 +1,8 @@
 import { z } from 'zod';
+import { idSchema, emailSchema, flatSchema } from './common.ts';
+export * from './common.ts';
+export * from './gate.ts';
 
-export const idSchema = z
-  .string()
-  .min(1)
-  .max(100)
-  .regex(/^[\w-]+$/);
-export const emailSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .max(254)
-  .pipe(z.email());
 export const relationshipSchema = z.enum(['OWNER', 'TENANT']);
 export const tokenInput = z.strictObject({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
@@ -42,11 +34,6 @@ export const decisionInput = z.discriminatedUnion('decision', [
   z.strictObject({ decision: z.literal('APPROVE') }),
   z.strictObject({ decision: z.literal('REJECT'), reason: rejectionReason }),
 ]);
-export const flatSchema = z.object({
-  id: idSchema,
-  label: z.string(),
-  tower: z.string(),
-});
 export const societySchema = z.object({
   id: idSchema,
   name: z.string(),
