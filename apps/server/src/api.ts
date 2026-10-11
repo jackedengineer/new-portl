@@ -1,3 +1,5 @@
+import { tokenCipher } from './notifications/tokens.js';
+import { stopNotificationQueue } from './notifications/jobs.js';
 import { passCodes } from './gate/pass-codes.js';
 import { pino } from 'pino';
 
@@ -29,6 +31,7 @@ const server = createApp(logger, {
   db,
   baseURL: authEnv.BETTER_AUTH_URL,
   passCodes: passCodes(authEnv.BETTER_AUTH_SECRET),
+  tokenCipher: tokenCipher(authEnv.BETTER_AUTH_SECRET),
 }).listen(env.PORT, env.HOST, () => {
   logger.info({ port: env.PORT }, 'API listening');
 });
@@ -53,6 +56,7 @@ function shutdown(signal: string) {
   server.close(async (error) => {
     clearTimeout(deadline);
     if (error) process.exitCode = 1;
+    await stopNotificationQueue(db);
     await db.$disconnect();
   });
 }

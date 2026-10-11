@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["portl_auth", "portl_registry", "portl_gate"]
+  schemas  = ["portl_auth", "portl_registry", "portl_gate", "portl_notifications"]
 }
 
 model User {
@@ -20,6 +20,7 @@ model User {
   twoFactorEnabled Boolean @default(false)
   twoFactor TwoFactor?
   totpUses AdminTotpUse[]
+  notifications Notification[]
   memberships Membership[]
   occupancies Occupancy[]
   applications ResidentApplication[]
@@ -156,6 +157,7 @@ model Society {
   guestPasses GuestPass[]
   visitorRequests VisitorRequest[]
   @@schema("portl_registry")
+  notifications Notification[]
 }
 model Tower {
   id String @id @default(uuid())
@@ -185,6 +187,7 @@ model Flat {
   @@schema("portl_registry")
 }
 model Membership {
+  grantVersion Int @default(1)
   id String @id @default(uuid())
   societyId String
   society Society @relation(fields: [societyId], references: [id])
@@ -278,6 +281,7 @@ model Gate {
   @@schema("portl_registry")
 }
 model GuardAssignment {
+  grantVersion Int @default(1)
   id String @id @default(uuid())
   societyId String
   gateId String
@@ -415,4 +419,59 @@ model GuestPass {
   @@index([societyId, createdAt, id])
   @@index([societyId, issuerId, validUntil])
   @@schema("portl_gate")
+}
+
+model Notification {
+ id String @id
+ societyId String
+ society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+ userId String
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ type String
+ resourceKind String
+ resourceId String
+ version Int
+ membershipId String
+ membershipVersion Int
+ view String
+ flatId String?
+ occupancyId String?
+ occupancyStartedAt DateTime?
+ assignmentId String?
+ assignmentVersion Int?
+ gateId String?
+ createdAt DateTime @default(now())
+ readAt DateTime?
+ expiresAt DateTime
+ pushEligible Boolean @default(true)
+ deliveries Delivery[]
+ @@unique([societyId, userId, type, resourceId, version])
+ @@index([userId, createdAt(sort: Desc), id(sort: Desc)], map: "notification_inbox")
+ @@schema("portl_notifications")
+}
+model PushDevice {
+ id String @id
+ userId String
+ sessionId String
+ generation String
+ platform String
+ tokenHash String @unique
+ cipherText String
+ enabled Boolean @default(true)
+ updatedAt DateTime @default(now())
+ @@index([userId], map: "device_user")
+ @@schema("portl_notifications")
+}
+model Delivery {
+ id String @id
+ notificationId String
+ notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+ deviceId String
+ generation String
+ status String @default("PENDING")
+ ticketId String?
+ errorCode String?
+ createdAt DateTime @default(now())
+ @@unique([notificationId, deviceId, generation])
+ @@schema("portl_notifications")
 }
