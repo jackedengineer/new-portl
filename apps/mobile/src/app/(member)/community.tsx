@@ -100,10 +100,25 @@ export default function Community() {
               }
             />
           )}
-          <Copy small>
-            Your society access is active. Gate and community services will be
-            added in the next development slices.
-          </Copy>
+          {member.roles.map((role) => (
+            <Button
+              key={role}
+              label={
+                role === 'GUARD'
+                  ? 'Open guard dashboard'
+                  : role === 'ADMIN'
+                    ? 'View society visitors'
+                    : 'Visitor requests & history'
+              }
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/visitors',
+                  params: { societyId: member.society.id, view: role },
+                })
+              }
+            />
+          ))}
         </Card>
       ))}
       <Card>
