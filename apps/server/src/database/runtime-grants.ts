@@ -2,6 +2,27 @@ import pg from 'pg';
 
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
+  await client.query(
+    `GRANT SELECT, INSERT ON portl_registry."DirectoryEntry", portl_registry."DirectoryContact" TO ${who}`,
+  );
+  await client.query(
+    `GRANT UPDATE (name,kind,service,description,archived,version) ON portl_registry."DirectoryEntry" TO ${who}`,
+  );
+  await client.query(
+    `GRANT UPDATE (phone,"sharePhone") ON portl_registry."DirectoryContact" TO ${who}`,
+  );
+  await client.query(
+    `GRANT INSERT ON portl_registry."Tower",portl_registry."Flat" TO ${who}`,
+  );
+  await client.query(
+    `GRANT UPDATE (name,archived,version) ON portl_registry."Tower" TO ${who}`,
+  );
+  await client.query(
+    `GRANT UPDATE (label,version) ON portl_registry."Flat" TO ${who}`,
+  );
+  await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_registry.check_flat_tower(),portl_registry.check_admission_flat() TO ${who}`,
+  );
   await client.query(`GRANT USAGE ON SCHEMA portl_community TO ${who}`);
   await client.query(
     `GRANT SELECT, INSERT ON portl_community."Notice" TO ${who}`,

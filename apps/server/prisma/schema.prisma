@@ -141,6 +141,7 @@ enum ApplicationStatus {
   @@schema("portl_registry")
 }
 model Society {
+  directory DirectoryEntry[]
   id String @id @default(uuid())
   name String
   joinCodeHash String @unique
@@ -161,6 +162,8 @@ model Society {
   notices Notice[]
 }
 model Tower {
+  archived Boolean @default(false)
+  version Int @default(1)
   id String @id @default(uuid())
   societyId String
   society Society @relation(fields: [societyId], references: [id])
@@ -171,6 +174,7 @@ model Tower {
   @@schema("portl_registry")
 }
 model Flat {
+  version Int @default(1)
   id String @id @default(uuid())
   societyId String
   society Society @relation(fields: [societyId], references: [id])
@@ -264,6 +268,31 @@ model RegistryAudit {
   requestId String
   createdAt DateTime @default(now())
   @@index([societyId, createdAt])
+  @@schema("portl_registry")
+}
+
+model DirectoryEntry {
+  id String @id @default(uuid())
+  societyId String
+  society Society @relation(fields: [societyId], references: [id])
+  name String
+  kind String
+  service String
+  description String @default("")
+  archived Boolean @default(false)
+  version Int @default(1)
+  contact DirectoryContact?
+  @@unique([societyId, id])
+  @@index([societyId, archived, id])
+  @@schema("portl_registry")
+}
+model DirectoryContact {
+  entryId String @id
+  societyId String
+  entry DirectoryEntry @relation(fields: [societyId, entryId], references: [societyId, id], onDelete: Cascade)
+  phone String?
+  sharePhone Boolean @default(false)
+  @@unique([societyId, entryId])
   @@schema("portl_registry")
 }
 
