@@ -58,7 +58,8 @@ async function login() {
         headers: {
           origin: 'portl://',
           'content-type': 'application/json',
-          'x-portl-client-ip': `198.51.100.${users.length + 1}`,
+          // Keep this suite's OTP budgets separate from gate/registry fixtures.
+          'x-portl-client-ip': `192.0.2.${users.length + 200}`,
         },
         body: JSON.stringify(body),
       }),
@@ -131,6 +132,7 @@ beforeAll(async () => {
   await owner.membership.createMany({
     data: [
       { societyId: sid, userId: admin.id, role: 'ADMIN' },
+      { societyId: sid, userId: guard.id, role: 'GUARD' },
       { societyId: sid, userId: resident.id, role: 'RESIDENT' },
       { societyId: sid, userId: household.id, role: 'RESIDENT' },
     ],
