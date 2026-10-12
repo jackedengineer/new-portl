@@ -3,6 +3,9 @@ import pg from 'pg';
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
   await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_registry.is_current_resident(text),portl_registry.active_admin(text) TO ${who}`,
+  );
+  await client.query(
     `GRANT SELECT, INSERT ON portl_registry."DirectoryEntry", portl_registry."DirectoryContact" TO ${who}`,
   );
   await client.query(

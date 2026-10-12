@@ -37,7 +37,7 @@ export function directoryService(db: PrismaClient) {
         else {
           const [eligibility] = await tx.$queryRaw<
             { allowed: boolean }[]
-          >`SELECT portl_community.is_resident(${sid}) AS allowed`;
+          >`SELECT portl_registry.is_current_resident(${sid}) AS allowed`;
           if (!eligibility?.allowed)
             throw new DomainError(
               403,
