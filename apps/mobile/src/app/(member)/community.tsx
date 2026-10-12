@@ -94,6 +94,30 @@ export default function Community() {
               {flat.relationship === 'OWNER' ? 'Owner' : 'Tenant'}
             </Copy>
           ))}
+          {member.roles.includes('RESIDENT') && (
+            <Button
+              label="Society notices"
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/notices',
+                  params: { societyId: member.society.id, view: 'RESIDENT' },
+                })
+              }
+            />
+          )}
+          {member.roles.includes('ADMIN') && (
+            <Button
+              label="Manage society notices"
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/notices',
+                  params: { societyId: member.society.id, view: 'ADMIN' },
+                })
+              }
+            />
+          )}
           {member.roles.includes('ADMIN') && (
             <Button
               label="Manage resident onboarding"

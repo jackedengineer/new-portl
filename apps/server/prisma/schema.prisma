@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["portl_auth", "portl_registry", "portl_gate", "portl_notifications"]
+  schemas  = ["portl_auth", "portl_registry", "portl_gate", "portl_notifications", "portl_community"]
 }
 
 model User {
@@ -158,6 +158,7 @@ model Society {
   visitorRequests VisitorRequest[]
   @@schema("portl_registry")
   notifications Notification[]
+  notices Notice[]
 }
 model Tower {
   id String @id @default(uuid())
@@ -474,4 +475,28 @@ model Delivery {
  createdAt DateTime @default(now())
  @@unique([notificationId, deviceId, generation])
  @@schema("portl_notifications")
+}
+
+model Notice {
+ id String @id
+ societyId String
+ society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+ title String
+ body String
+ status String @default("DRAFT")
+ version Int @default(1)
+ createdBy String
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now())
+ publishedAt DateTime?
+ archivedAt DateTime?
+ publication NoticePublication?
+ @@index([societyId, status, createdAt(sort: Desc), id(sort: Desc)], map: "notice_board")
+ @@schema("portl_community")
+}
+model NoticePublication {
+ noticeId String @id
+ notice Notice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+ capturedAt DateTime @default(now())
+ @@schema("portl_community")
 }

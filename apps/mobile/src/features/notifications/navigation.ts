@@ -6,6 +6,15 @@ export async function notificationDestination(
   const tap = notificationTapInput.safeParse(data);
   if (!tap.success) return null;
   const item = await load(tap.data.notificationId);
+  if (item.resourceKind === 'NOTICE')
+    return {
+      pathname: '/notice' as const,
+      params: {
+        id: item.resourceId,
+        societyId: item.societyId,
+        view: 'RESIDENT',
+      },
+    };
   return {
     pathname:
       item.resourceKind === 'PASS'

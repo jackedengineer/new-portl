@@ -1,6 +1,6 @@
 # Portl
 
-An Expo / React Native society management app with a TypeScript / Express backend. Implemented slices include email OTP login, resident admission, guard visitor registration, resident decisions and distinct entry/exit history and a private notification inbox across independent societies. Society authority is granted only by a valid invitation or an admin approval.
+An Expo / React Native society management app with a TypeScript / Express backend. Implemented slices include email OTP login, resident admission, guard visitor registration, resident decisions, entry/exit history, a private notification inbox and a society notice board across independent societies. Society authority is granted only by a valid invitation or an admin approval.
 
 ## Local development
 
@@ -60,6 +60,14 @@ API and worker use different restricted roles; only an operator initializes/migr
 
 Expo Go supports the inbox, but Portl push needs an installed development build, a real EAS project and Android FCM v1 credentials. The prepared development/preview APK profiles do not mean a signed APK has been built or push tested. iPhone push requires Apple Developer/APNs setup. Neither Firebase nor an EAS project is provisioned by this change.
 
+## Society notices
+
+Admins with recent authenticator verification can open **Manage society notices** from Community, save and edit plain-text drafts, review before publishing to the whole society, and archive drafts or published notices. Published text is immutable; archive and create a new notice for a correction. Residents open **Society notices** to read currently published updates. Guards have no notice-board access through their guard role.
+
+Publishing captures current residents once and commits the notice, audit, private inbox items and batched push jobs together. A resident with several flats receives one event. Newly admitted residents can read existing published notices without receiving historical publish alerts. Archiving hides the notice and its inbox events from residents and suppresses pending delivery; an already delivered OS notification cannot be recalled.
+
+This increment adds migration `202610120001_society_notices`. Generate Prisma, apply migrations with the owner connection, initialize queues if not already set up, and rerun runtime/worker provisioning before starting the updated services. No new environment keys or dependencies are required. Update API, worker and mobile together before publishing notices: older mobile notification schemas do not understand `NOTICE_PUBLISHED`. Existing visitor and guest-pass endpoints retain their contracts. Physical-device notice and push checks remain required.
+
 ## Checks
 
 ```sh
@@ -76,4 +84,4 @@ Integration tests use real PostgreSQL and synthetic identities with a fake email
 
 GitHub Actions runs these checks on pushes to `main` and pull requests. A separate dependency-audit job reports upstream issues without hiding them; see [the current dependency review](DEPENDENCY_REVIEW.md). Deployment and store submission are not enabled by this workflow. Branch protection and required check settings must be configured before merging later feature pull requests.
 
-Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.8.0 (CHG-0009); specification editions are independent of app versions. Community modules, Socket.IO signals, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.
+Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.9.0 (CHG-0010); specification editions are independent of app versions. Polls, helpdesk, amenities, directory/admin operations, Socket.IO signals, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.

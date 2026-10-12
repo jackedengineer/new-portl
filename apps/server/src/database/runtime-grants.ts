@@ -2,6 +2,16 @@ import pg from 'pg';
 
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
+  await client.query(`GRANT USAGE ON SCHEMA portl_community TO ${who}`);
+  await client.query(
+    `GRANT SELECT, INSERT ON portl_community."Notice" TO ${who}`,
+  );
+  await client.query(
+    `GRANT UPDATE (title,body,status,version,"updatedAt","publishedAt","archivedAt") ON portl_community."Notice" TO ${who}`,
+  );
+  await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_community.is_resident(text),portl_community.active_admin(text),portl_community.check_notice_change(),portl_community.notify_notice(text) TO ${who}`,
+  );
   await client.query(
     `GRANT USAGE ON SCHEMA portl_notifications, portl_jobs TO ${who}`,
   );

@@ -105,7 +105,7 @@ export async function enablePush(
       );
     if (Platform.OS === 'android')
       await module.setNotificationChannelAsync('gate', {
-        name: 'Gate updates',
+        name: 'Community updates',
         importance: module.AndroidImportance.HIGH,
       });
     check();

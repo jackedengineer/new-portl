@@ -51,6 +51,25 @@ export async function stopNotificationQueue(db: PrismaClient) {
   senders.delete(db);
 }
 
+export async function enqueueNotificationBatch(
+  db: PrismaClient,
+  tx: Tx,
+  records: { id: string }[],
+) {
+  if (!records.length) return;
+  const boss = await sender(db);
+  for (let offset = 0; offset < records.length; offset += 200) {
+    const batch = records.slice(offset, offset + 200);
+    const ids = await boss.insert(
+      'notification.push',
+      batch.map((record) => ({ data: { notificationId: record.id } })),
+      { db: fromPrisma(tx), returnId: true },
+    );
+    if (ids?.length !== batch.length)
+      throw new Error('Notification batch could not be appended');
+  }
+}
+
 export async function withNotificationTransaction<T>(
   db: PrismaClient,
   actor: Actor,
