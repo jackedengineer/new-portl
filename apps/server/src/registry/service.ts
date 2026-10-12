@@ -33,6 +33,7 @@ const conflict = () =>
     'This request has already been processed. Refresh to see its status.',
   );
 async function validFlat(tx: Tx, societyId: string, flatId: string) {
+  await tx.$queryRaw`SELECT id FROM portl_registry."Flat" WHERE id=${flatId} AND "societyId"=${societyId} AND NOT archived FOR SHARE`;
   const flat = await tx.flat.findFirst({
     where: { id: flatId, societyId, archived: false },
     include: { tower: true },

@@ -10,6 +10,7 @@ export async function grantResident(
 ) {
   // Serialize invitation/application overlap for one person in one society.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${societyId + ':' + userId}, 0))`;
+  await tx.$queryRaw`SELECT id FROM portl_registry."Flat" WHERE id=${flatId} AND "societyId"=${societyId} AND NOT archived FOR SHARE`;
   const flat = await tx.flat.findFirst({
     where: { id: flatId, societyId, archived: false },
   });

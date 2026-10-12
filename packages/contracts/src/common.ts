@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export const relationshipSchema = z.enum(['OWNER', 'TENANT']);
 
 export const idSchema = z
   .string()

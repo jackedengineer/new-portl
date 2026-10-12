@@ -1,9 +1,13 @@
 import { z } from 'zod';
-import { idSchema, emailSchema, flatSchema } from './common.ts';
+import {
+  idSchema,
+  emailSchema,
+  flatSchema,
+  relationshipSchema,
+} from './common.ts';
 export * from './common.ts';
 export * from './gate.ts';
 
-export const relationshipSchema = z.enum(['OWNER', 'TENANT']);
 export const tokenInput = z.strictObject({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
@@ -109,3 +113,4 @@ export * from './guest-passes.ts';
 
 export * from './notifications.ts';
 export * from './notices.ts';
+export * from './administration.ts';
