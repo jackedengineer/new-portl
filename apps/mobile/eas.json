@@ -2,16 +2,25 @@
   "cli": { "appVersionSource": "remote" },
   "build": {
     "development": {
+      "node": "24.14.0",
+      "pnpm": "10.34.5",
       "developmentClient": true,
       "environment": "development",
       "distribution": "internal",
       "android": { "buildType": "apk" }
     },
     "preview": {
+      "node": "24.14.0",
+      "pnpm": "10.34.5",
       "environment": "preview",
       "distribution": "internal",
       "android": { "buildType": "apk" }
     },
-    "production": { "environment": "production", "autoIncrement": true }
+    "production": {
+      "node": "24.14.0",
+      "pnpm": "10.34.5",
+      "environment": "production",
+      "autoIncrement": true
+    }
   }
 }
