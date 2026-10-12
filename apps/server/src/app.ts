@@ -4,6 +4,7 @@ import type { TokenCipher } from './notifications/tokens.js';
 import { randomUUID } from 'node:crypto';
 
 import express from 'express';
+import { administrationRouter } from './administration/router.js';
 import helmet from 'helmet';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Logger } from 'pino';
@@ -175,6 +176,10 @@ export function createApp(logger?: Logger, services?: AppServices) {
     app.use(
       '/v1/societies/:societyId/notices',
       noticeRouter(services.auth, services.db),
+    );
+    app.use(
+      '/v1/societies/:societyId',
+      administrationRouter(services.auth, services.db),
     );
     app.use('/v1', registryRouter(services.auth, services.db));
   }
