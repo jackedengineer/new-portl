@@ -8,6 +8,7 @@ export const notificationType = z.enum([
   'VISITOR_EXITED',
   'GUEST_ENTERED',
   'GUEST_EXITED',
+  'NOTICE_PUBLISHED',
 ]);
 export const notificationTapInput = z.strictObject({
   notificationId: z.uuid(),
@@ -28,7 +29,7 @@ export const notificationSchema = z.object({
   id: z.uuid(),
   societyId: idSchema,
   type: notificationType,
-  resourceKind: z.enum(['REQUEST', 'PASS']),
+  resourceKind: z.enum(['REQUEST', 'PASS', 'NOTICE']),
   resourceId: idSchema,
   view: z.enum(['RESIDENT', 'GUARD']),
   createdAt: z.iso.datetime(),
@@ -45,6 +46,10 @@ export const notificationCopy: Record<
   z.infer<typeof notificationType>,
   { title: string; body: string }
 > = {
+  NOTICE_PUBLISHED: {
+    title: 'New society notice',
+    body: 'Open Portl to read an update from your society office.',
+  },
   VISITOR_REQUESTED: {
     title: 'Visitor approval needed',
     body: 'Open Portl to review a request from the gate.',
