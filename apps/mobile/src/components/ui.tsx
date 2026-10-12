@@ -186,14 +186,16 @@ export function Choice({
   label,
   selected,
   onPress,
+  role = 'radio',
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  role?: 'radio' | 'checkbox';
 }) {
   return (
     <Pressable
-      accessibilityRole="radio"
+      accessibilityRole={role}
       accessibilityState={{ checked: selected }}
       accessibilityLabel={label}
       onPress={onPress}
