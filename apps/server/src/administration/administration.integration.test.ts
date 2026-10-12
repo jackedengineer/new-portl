@@ -15,6 +15,10 @@ const db = createDatabase(runtime),
   owner = createDatabase(direct);
 const sent = new Map<string, string>(),
   prefix = randomUUID();
+// Isolate this run from other suites and prior runs without relaxing auth limits.
+const network = randomBytes(2);
+const fixtureIp = (index: number) =>
+  `10.${network[0]}.${network[1]}.${index + 1}`;
 const auth = createAuth(
   db,
   {
@@ -56,7 +60,7 @@ async function login() {
         headers: {
           origin: 'portl://',
           'content-type': 'application/json',
-          'x-portl-client-ip': `198.51.100.${users.length + 1}`,
+          'x-portl-client-ip': fixtureIp(users.length),
         },
         body: JSON.stringify(body),
       }),
@@ -157,6 +161,17 @@ afterAll(async () => {
   await owner.society.deleteMany({ where: { id: { in: societies } } });
   await owner.user.deleteMany({
     where: { id: { in: users.map((u) => u.id) } },
+  });
+  await db.rateLimit.deleteMany({
+    where: {
+      key: {
+        in: users.flatMap((_, i) =>
+          ['/email-otp/send-verification-otp', '/sign-in/email-otp'].map(
+            (path) => `${fixtureIp(i)}|${path}`,
+          ),
+        ),
+      },
+    },
   });
   await db.$disconnect();
   await owner.$disconnect();
@@ -329,6 +344,17 @@ it('protects private contact rows, explicitly shares/revokes numbers and exclude
     },
   );
   expect(contacts).toEqual([]);
+  const adminResident = await owner.membership.create({
+    data: { societyId: sid, userId: admin.id, role: 'RESIDENT' },
+  });
+  const adminOccupancy = await owner.occupancy.create({
+    data: { societyId: sid, flatId, userId: admin.id, relationship: 'OWNER' },
+  });
+  expect(
+    (await api(admin, 'get', '/directory?view=RESIDENT')).body.items[0].phone,
+  ).toBeNull();
+  await owner.occupancy.delete({ where: { id: adminOccupancy.id } });
+  await owner.membership.delete({ where: { id: adminResident.id } });
   expect(
     (await api(admin, 'get', '/directory?view=ADMIN')).body.items[0].phone,
   ).toBe(input.phone);

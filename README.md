@@ -1,6 +1,6 @@
 # Portl
 
-An Expo / React Native society management app with a TypeScript / Express backend. Implemented slices include email OTP login, resident admission, guard visitor registration, resident decisions, entry/exit history, a private notification inbox and a society notice board across independent societies. Society authority is granted only by a valid invitation or an admin approval.
+An Expo / React Native society management app with a TypeScript / Express backend. Implemented slices include email OTP login, resident admission, guard visitor registration, resident decisions, entry/exit history, notifications, society notices and society administration/directory APIs across independent societies. Society authority is granted only by a valid invitation or an admin approval.
 
 ## Local development
 
@@ -68,6 +68,12 @@ Publishing captures current residents once and commits the notice, audit, privat
 
 This increment adds migration `202610120001_society_notices`. Generate Prisma, apply migrations with the owner connection, initialize queues if not already set up, and rerun runtime/worker provisioning before starting the updated services. No new environment keys or dependencies are required. Update API, worker and mobile together before publishing notices: older mobile notification schemas do not understand `NOTICE_PUBLISHED`. Existing visitor and guest-pass endpoints retain their contracts. Physical-device notice and push checks remain required.
 
+## Society administration and directory
+
+Assured admins can manage towers/flats, inspect current/ended residencies, end one flat’s residency and manage staff/service-provider contacts. Archival preserves history and rejects structures still in use. Ending a resident’s last flat revokes only that society’s resident access and outstanding resident invitations; other roles and societies remain intact. Directory records never grant login or gate access. Phone numbers are private by default and become resident-visible only after explicit admin sharing; guard-only accounts cannot read the directory.
+
+Apply migrations and rerun runtime provisioning before starting the updated API. With the matching mobile increment, open **Community → Society overview** for administration or **Community → Community directory** as a resident. No new credentials, dependencies or native plugins are required. Use an isolated development database for tests; new-screen device acceptance remains separate from automated checks.
+
 ## Checks
 
 ```sh
@@ -84,4 +90,4 @@ Integration tests use real PostgreSQL and synthetic identities with a fake email
 
 GitHub Actions runs these checks on pushes to `main` and pull requests. A separate dependency-audit job reports upstream issues without hiding them; see [the current dependency review](DEPENDENCY_REVIEW.md). Deployment and store submission are not enabled by this workflow. Branch protection and required check settings must be configured before merging later feature pull requests.
 
-Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 1.9.0 (CHG-0010); specification editions are independent of app versions. Polls, helpdesk, amenities, directory/admin operations, Socket.IO signals, account deletion/privacy flows, production provisioning/recovery and store releases remain future slices. Before public deployment, resolve privacy/retention, native-device, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.
+Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 2.0.0 (CHG-0011); specification editions are independent of app versions. The owner deferred polls, helpdesk and amenities/bookings after v1. Authorized live signals, account deletion/privacy flows, production provisioning/recovery and signed store releases remain v1 work. Android development APK installation and notification receipt are owner-confirmed; that does not establish acceptance of these new screens or release builds. Before public deployment, resolve privacy/retention, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.
