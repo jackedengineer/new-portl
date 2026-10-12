@@ -96,6 +96,30 @@ export default function Community() {
           ))}
           {member.roles.includes('RESIDENT') && (
             <Button
+              label="Community directory"
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/directory',
+                  params: { societyId: member.society.id },
+                })
+              }
+            />
+          )}
+          {member.roles.includes('ADMIN') && (
+            <Button
+              label="Society overview"
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/society-operations',
+                  params: { societyId: member.society.id },
+                })
+              }
+            />
+          )}
+          {member.roles.includes('RESIDENT') && (
+            <Button
               label="Society notices"
               variant="secondary"
               onPress={() =>
