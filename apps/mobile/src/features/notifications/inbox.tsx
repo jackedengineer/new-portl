@@ -97,10 +97,10 @@ export function NotificationInbox({ userId }: { userId: string }) {
   return (
     <>
       <Card>
-        <Label>Stay close to the gate</Label>
+        <Label>Stay close to your community</Label>
         <Copy>
-          Your private inbox keeps gate updates together. Push alerts show a
-          generic message on your lock screen.
+          Your private inbox keeps gate updates and society notices together.
+          Push alerts show a generic message on your lock screen.
         </Copy>
         {pushAvailable() ? (
           <Button
@@ -140,7 +140,8 @@ export function NotificationInbox({ userId }: { userId: string }) {
       )}
       {!inbox.isPending && !inbox.error && !items.length && (
         <Copy>
-          All quiet for now. Visitor requests and gate updates will appear here.
+          All quiet for now. Visitor requests, gate updates and society notices
+          will appear here.
         </Copy>
       )}
       {items.map((item) => (

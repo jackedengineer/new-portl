@@ -1,4 +1,5 @@
 import { notificationRouter } from './notifications/router.js';
+import { noticeRouter } from './notices/router.js';
 import type { TokenCipher } from './notifications/tokens.js';
 import { randomUUID } from 'node:crypto';
 
@@ -170,6 +171,10 @@ export function createApp(logger?: Logger, services?: AppServices) {
     app.use(
       '/v1/notifications',
       notificationRouter(services.auth, services.db, services.tokenCipher),
+    );
+    app.use(
+      '/v1/societies/:societyId/notices',
+      noticeRouter(services.auth, services.db),
     );
     app.use('/v1', registryRouter(services.auth, services.db));
   }

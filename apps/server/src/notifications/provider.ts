@@ -88,7 +88,7 @@ export function expoProvider(
     ): Promise<PushResult> {
       const result = await post('send', {
         to: token,
-        title: 'Portl gate update',
+        title: 'Portl community update',
         body: 'Open Portl to review your community update.',
         data: { notificationId },
         channelId: 'gate',

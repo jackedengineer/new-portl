@@ -37,6 +37,7 @@ export function NotificationBridge() {
             queryKey: ['notifications', userId],
           });
           void client.invalidateQueries({ queryKey: ['gate', userId] });
+          void client.invalidateQueries({ queryKey: ['notices', userId] });
         };
         const handled = new Set<string>();
         const respond = async (
