@@ -17,6 +17,7 @@ export const societyLookupInput = z.strictObject({
     .trim()
     .toUpperCase()
     .regex(/^[A-Z0-9]{12}$/),
+  cursor: z.uuid().optional(),
 });
 export const applicationInput = z.strictObject({
   societyCode: societyLookupInput.shape.code,
@@ -79,9 +80,12 @@ export const invitationSchema = z.object({
   status: z.enum(['ACTIVE', 'ACCEPTED', 'REVOKED', 'EXPIRED']),
   expiresAt: z.string(),
 });
-export const lookupSchema = z.object({
-  society: societySchema,
+export const flatSelectionSchema = z.object({
   flats: z.array(flatSchema),
+  nextCursor: z.uuid().nullable().optional(),
+});
+export const lookupSchema = flatSelectionSchema.extend({
+  society: societySchema,
 });
 export const previewSchema = z.object({
   society: societySchema,

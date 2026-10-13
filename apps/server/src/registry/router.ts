@@ -88,7 +88,7 @@ export function registryRouter(auth: PortlAuth, db: PrismaClient) {
         'RATE_LIMITED',
         'Please wait before checking another society code',
       );
-    res.json(await service.lookup(actor(res), input.code));
+    res.json(await service.lookup(actor(res), input.code, input.cursor));
   });
   router.post('/onboarding/invitation-preview', async (req, res) => {
     const input = body(tokenInput, req);
@@ -120,7 +120,13 @@ export function registryRouter(auth: PortlAuth, db: PrismaClient) {
       .json(await service.apply(actor(res), id(req.params.societyId), input));
   });
   router.get('/societies/:societyId/admin/flats', async (req, res) =>
-    res.json(await service.adminFlats(actor(res), id(req.params.societyId))),
+    res.json(
+      await service.adminFlats(
+        actor(res),
+        id(req.params.societyId),
+        cursor(req),
+      ),
+    ),
   );
   router.get('/societies/:societyId/admin/applications', async (req, res) =>
     res.json(

@@ -3,16 +3,14 @@ import { Share, Text } from 'react-native';
 import {
   useInfiniteQuery,
   useMutation,
-  useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
 import {
-  flatSchema,
+  flatSelectionSchema,
   invitationCreatedSchema,
   invitationInput,
   invitationListSchema,
 } from '@portl/contracts';
-import { z } from 'zod';
 import { api, messageOf, successSchema } from '../../lib/api';
 import {
   Badge,
@@ -47,15 +45,18 @@ export function AdminInvitations({
   const [error, setError] = useState('');
   const [token, setToken] = useState('');
   const key = ['admin-invitations', userId, societyId];
-  const flats = useQuery({
+  const flats = useInfiniteQuery({
     queryKey: ['admin-flats', userId, societyId],
-    queryFn: ({ signal }) =>
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) =>
       api(
-        `/societies/${societyId}/admin/flats`,
-        z.object({ flats: z.array(flatSchema) }),
+        `/societies/${societyId}/admin/flats${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        flatSelectionSchema,
         undefined,
         signal,
+        userId,
       ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
   const list = useInfiniteQuery({
     queryKey: key,
@@ -66,6 +67,7 @@ export function AdminInvitations({
         invitationListSchema,
         undefined,
         signal,
+        userId,
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
@@ -76,6 +78,8 @@ export function AdminInvitations({
         `/societies/${societyId}/admin/invitations`,
         invitationCreatedSchema,
         input,
+        undefined,
+        userId,
       ),
     onSuccess: async (result) => {
       setToken(result.token);
@@ -90,6 +94,8 @@ export function AdminInvitations({
         `/societies/${societyId}/admin/invitations/${id}/revoke`,
         successSchema,
         {},
+        undefined,
+        userId,
       ),
     onSuccess: () => client.invalidateQueries({ queryKey: key }),
   });
@@ -156,7 +162,7 @@ export function AdminInvitations({
             editable={!create.isPending}
           />
           {flats.isPending && <Loading label="Loading flats…" />}
-          {flats.error && (
+          {flats.error && !flats.data && (
             <>
               <ErrorMessage message={messageOf(flats.error)} />
               <Button
@@ -168,7 +174,12 @@ export function AdminInvitations({
           )}
           {flats.data && (
             <FlatPicker
-              flats={flats.data.flats}
+              flats={flats.data.pages.flatMap((page) => page.flats)}
+              hasMore={flats.hasNextPage}
+              loadingMore={flats.isFetchingNextPage}
+              loadError={flats.error ? messageOf(flats.error) : ''}
+              onLoadMore={() => void flats.fetchNextPage()}
+              onRefresh={() => void flats.refetch()}
               value={flatId}
               onChange={setFlatId}
             />
