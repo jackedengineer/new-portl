@@ -65,6 +65,11 @@ export default function Community() {
       </Title>
       <Copy>Signed in as {me.user.email}</Copy>
       <Button
+        label="Account & privacy"
+        variant="secondary"
+        onPress={() => router.push('/account')}
+      />
+      <Button
         label="Notifications"
         variant="secondary"
         onPress={() => router.push('/notifications')}

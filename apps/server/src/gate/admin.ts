@@ -41,11 +41,10 @@ export function gateAdmin(db: PrismaClient) {
           }))
         )
           throw missing();
-        const user = await tx.user.findUnique({
-          where: { email: input.email },
-          select: { id: true, emailVerified: true },
-        });
-        if (!user?.emailVerified)
+        const [user] = await tx.$queryRaw<
+          { id: string }[]
+        >`SELECT id FROM portl_auth."User" WHERE email=${input.email} AND "emailVerified" AND "deletionRequestedAt" IS NULL FOR SHARE`;
+        if (!user)
           throw new DomainError(
             422,
             'VERIFIED_ACCOUNT_REQUIRED',
@@ -89,6 +88,10 @@ export function gateAdmin(db: PrismaClient) {
           where: { id, societyId: sid },
         });
         if (!row) throw missing();
+        const subjects = await tx.$queryRaw<
+          { id: string }[]
+        >`SELECT id FROM portl_auth."User" WHERE id=${row.userId} AND "deletionRequestedAt" IS NULL FOR SHARE`;
+        if (!subjects.length) throw missing();
         await serializeGuard(tx, sid, row.userId);
         await tx.guardAssignment.update({
           where: { id },

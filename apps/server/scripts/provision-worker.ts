@@ -44,7 +44,7 @@ export async function provisionWorker(client: pg.Client, direct: string) {
       `GRANT CONNECT ON DATABASE ${pg.escapeIdentifier(decodeURIComponent(url.pathname.slice(1)))} TO ${who}`,
     );
     await client.query(
-      `GRANT USAGE ON SCHEMA portl_notifications,portl_jobs TO ${who}`,
+      `GRANT USAGE ON SCHEMA portl_notifications,portl_jobs,portl_auth TO ${who}`,
     );
     await client.query(
       `GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA portl_jobs TO ${who}`,
@@ -63,6 +63,9 @@ export async function provisionWorker(client: pg.Client, direct: string) {
     );
     await client.query(
       `GRANT EXECUTE ON FUNCTION portl_notifications.delivery_targets(text),portl_notifications.retire_device(text,text),portl_notifications.cleanup() TO ${who}`,
+    );
+    await client.query(
+      `GRANT EXECUTE ON FUNCTION portl_auth.account_deletion_ledger(), portl_auth.process_account_deletion(text[]),portl_auth.cleanup_account_metadata() TO ${who}`,
     );
     await client.query('COMMIT');
   } catch (error) {

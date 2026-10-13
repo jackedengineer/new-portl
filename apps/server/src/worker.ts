@@ -1,3 +1,7 @@
+import { mkdir } from 'node:fs/promises';
+import { assertLedgerDirectory } from './account/ledger.js';
+import { isAbsolute, resolve } from 'node:path';
+import { accountWorker } from './account/worker.js';
 import { pino } from 'pino';
 import { z } from 'zod';
 import { createDatabase } from './database/client.js';
@@ -13,16 +17,23 @@ import {
 const env = parseRuntimeEnv(process.env),
   logger = pino({
     level: env.LOG_LEVEL,
-    base: { service: 'portl-notifications' },
+    base: { service: 'portl-worker' },
   });
 const config = z
   .object({
     WORKER_DATABASE_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(32),
+    ACCOUNT_DELETION_LEDGER_DIR: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().refine(isAbsolute).optional(),
+    ),
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
   })
   .safeParse(process.env);
-if (!config.success) {
+if (
+  !config.success ||
+  (env.NODE_ENV === 'production' && !config.data.ACCOUNT_DELETION_LEDGER_DIR)
+) {
   logger.fatal(
     'Configure WORKER_DATABASE_URL and BETTER_AUTH_SECRET; secrets withheld',
   );
@@ -32,7 +43,14 @@ const db = createDatabase(config.data.WORKER_DATABASE_URL),
   boss = notificationQueue(db, true),
   cipher = tokenCipher(config.data.BETTER_AUTH_SECRET),
   provider = expoProvider(config.data.EXPO_ACCESS_TOKEN);
+let stopAccounts: (() => Promise<void>) | undefined;
 try {
+  const ledgerPath =
+    config.data.ACCOUNT_DELETION_LEDGER_DIR ||
+    resolve('.private/account-deletions');
+  if (env.NODE_ENV !== 'production')
+    await mkdir(ledgerPath, { recursive: true, mode: 0o700 });
+  await assertLedgerDirectory(ledgerPath);
   await assertNotificationWorker(db);
   await boss.start();
   for (const name of ['notification.push', 'notification.receipt'] as const)
@@ -72,7 +90,8 @@ try {
         }
       },
     );
-  logger.info('Notification worker ready');
+  stopAccounts = await accountWorker(db, logger, ledgerPath);
+  logger.info('Notification and account lifecycle worker ready');
 } catch {
   logger.fatal(
     'Notification worker startup failed; check restricted grants and queue initialization',
@@ -94,6 +113,7 @@ async function stop() {
   if (stopping) return;
   stopping = true;
   clearInterval(maintenance);
+  await stopAccounts?.();
   await boss.stop({ timeout: 15000 });
   await db.$disconnect();
 }

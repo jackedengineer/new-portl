@@ -57,6 +57,7 @@ export const meSchema = z.object({
   }),
   memberships: z.array(membershipSchema),
   onboardingRequired: z.boolean(),
+  policyRequired: z.boolean(),
   adminAssuredUntil: z.string().nullable(),
   adminAuthenticatorConfigured: z.boolean(),
 });
@@ -115,3 +116,5 @@ export * from './notifications.ts';
 export * from './notices.ts';
 export * from './administration.ts';
 export * from './gate-live.ts';
+
+export * from './account.ts';

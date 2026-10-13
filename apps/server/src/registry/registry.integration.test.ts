@@ -68,7 +68,14 @@ async function login(index = users.length) {
           'content-type': 'application/json',
           'x-portl-client-ip': `192.0.2.${++ip}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ...body,
+          policyAcceptance: {
+            adult: true,
+            termsVersion: '2026-10-13',
+            privacyVersion: '2026-10-13',
+          },
+        }),
       }),
     );
   expect(

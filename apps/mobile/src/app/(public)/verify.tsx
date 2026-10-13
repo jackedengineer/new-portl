@@ -1,3 +1,4 @@
+import { policyAcceptance } from '../../features/account/policy';
 import { useEffect, useState } from 'react';
 import { Redirect, router } from 'expo-router';
 import { useSession } from '../../auth/session';
@@ -40,6 +41,7 @@ export default function Verify() {
       const result = await authClient.signIn.emailOtp({
         email: challenge.email,
         otp: code,
+        policyAcceptance,
       });
       if (result.error)
         throw new Error(

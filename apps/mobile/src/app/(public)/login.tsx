@@ -1,3 +1,4 @@
+import { PolicyChoice } from '../../features/account/policy';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -16,6 +17,7 @@ import {
 } from '../../components/ui';
 
 export default function Login() {
+  const [accepted, setAccepted] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
@@ -24,6 +26,10 @@ export default function Login() {
     const parsed = emailSchema.safeParse(email);
     if (!parsed.success) {
       setError('Enter a valid email address.');
+      return;
+    }
+    if (!accepted) {
+      setError('Confirm your age and accept the terms and privacy notice.');
       return;
     }
     setError('');
@@ -84,11 +90,17 @@ export default function Login() {
         onSubmitEditing={() => void submit()}
         returnKeyType="go"
       />
+      <PolicyChoice accepted={accepted} onChange={setAccepted} />
       <ErrorMessage message={error} />
       <Button
         label="Continue with email"
         pending={pending}
         onPress={() => void submit()}
+      />
+      <Button
+        label="Deletion status"
+        variant="quiet"
+        onPress={() => router.push('/deletion-status')}
       />
       <Copy small>
         We’ll send a six-digit sign-in code. Your society admin confirms your

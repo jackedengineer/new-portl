@@ -62,6 +62,7 @@ type SessionContext = {
   refresh: () => Promise<void>;
   signedIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  forgetSession: () => Promise<void>;
 };
 const Context = createContext<SessionContext | null>(null);
 function Session({ children }: { children: ReactNode }) {
@@ -112,6 +113,17 @@ function Session({ children }: { children: ReactNode }) {
       throw new Error(
         'Could not sign out. Check your connection and try again.',
       );
+    await clearLocalSession();
+  }
+  async function forgetSession() {
+    // The server has already revoked this session (deletion/email change/revoke).
+    // Expo's supported sign-out action clears its cookie cache before networking.
+    await clearLocalSession();
+    await authClient
+      .signOut({ fetchOptions: { timeout: 3000 } })
+      .catch(() => {});
+  }
+  async function clearLocalSession() {
     setChallenge(null);
     await client.cancelQueries();
     client.removeQueries({
@@ -132,6 +144,7 @@ function Session({ children }: { children: ReactNode }) {
         refresh,
         signedIn,
         signOut,
+        forgetSession,
       }}
     >
       {children}

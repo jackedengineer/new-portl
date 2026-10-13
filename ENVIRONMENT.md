@@ -121,3 +121,17 @@ Store signing and publishing credentials are files/account permissions as well a
 - [Expo environment variables and public values](https://docs.expo.dev/guides/environment-variables/)
 - [Expo push setup](https://docs.expo.dev/push-notifications/push-notifications-setup/)
 - [EAS credentials](https://docs.expo.dev/app-signing/app-credentials/)
+
+## Account lifecycle worker
+
+The existing restricted worker also handles account erasure and hourly auth metadata cleanup. Apply all migrations and rerun `pnpm --filter @portl/server db:provision` for the new function grants. Start it using the existing worker command. No additional email, Expo or Firebase credential is required.
+
+Development startup creates ignored `apps/server/.private/account-deletions`. Production requires `ACCOUNT_DELETION_LEDGER_DIR` pointing to an existing absolute, mode-0700 directory on a durable private volume. Create an empty directory only on a genuinely fresh deployment. Run one lifecycle worker, retain access-controlled independent backups, and monitor disk availability and pending deletion age. Each mode-0600 record holds a hashed former account ID and expiry; it is private data. Missing/corrupt storage fails closed and must be recovered, not replaced with an empty directory.
+
+Keep API and worker offline during database restoration. Preserve the latest external ledger independently of the snapshot, apply current migrations, and run from `apps/server`:
+
+```sh
+pnpm exec tsx --env-file=.env scripts/account-restore.ts --offline-restore /absolute/private/ledger-directory
+```
+
+The owner-only `DIRECT_DATABASE_URL` must point at the intended offline restored database. A failed run or remaining pending deletion blocks reopening. Verify erased identities/content absent and unrelated data intact before resuming service. All restorable database backups must be younger than the 90-day recovery-record lifetime; actual provider settings and a restore drill remain public-deployment requirements. The detailed versioned acceptance and operator procedures remain in the external specification set.

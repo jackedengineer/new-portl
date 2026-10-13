@@ -19,10 +19,14 @@ function Routes() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="deletion-status" />
       <Stack.Protected guard={!session.me}>
         <Stack.Screen name="(public)" />
       </Stack.Protected>
       <Stack.Protected guard={!!session.me}>
+        <Stack.Screen name="account" />
+      </Stack.Protected>
+      <Stack.Protected guard={!!session.me && !session.me.policyRequired}>
         <Stack.Screen name="(member)" />
       </Stack.Protected>
     </Stack>
