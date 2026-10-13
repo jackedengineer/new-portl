@@ -31,15 +31,17 @@ it.each([false, true])(
       }
       return [];
     });
+    const execute = vi.fn().mockResolvedValue(1);
     try {
       if (unavailable) await chmod(path, 0o755);
       const stop = await accountWorker(
-        { $queryRaw: query } as unknown as PrismaClient,
+        { $queryRaw: query, $executeRaw: execute } as unknown as PrismaClient,
         logger as unknown as Logger,
         path,
       );
       await stop();
       expect(processed).toBe(!unavailable);
+      expect(execute).toHaveBeenCalledTimes(unavailable ? 0 : 1);
       expect(logger.error).toHaveBeenCalledTimes(unavailable ? 1 : 0);
     } finally {
       await rm(path, { recursive: true, force: true });
