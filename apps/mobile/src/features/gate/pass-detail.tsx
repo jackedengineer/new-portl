@@ -59,15 +59,25 @@ export function PassDetail({
   const query = useQuery({
     queryKey: [...gateKey(userId, societyId), 'pass-detail', view, id],
     queryFn: async ({ signal }) => {
-      const result = await api(
-        gatePath(societyId, `passes/${id}?view=${view}`),
-        guestPassDetailSchema,
-        undefined,
-        signal,
-      );
-      if (result.pass.status !== 'READY' && result.pass.status !== 'SCHEDULED')
-        wipe();
-      return result;
+      try {
+        const result = await api(
+          gatePath(societyId, `passes/${id}?view=${view}`),
+          guestPassDetailSchema,
+          undefined,
+          signal,
+          userId,
+        );
+        if (
+          result.pass.status !== 'READY' &&
+          result.pass.status !== 'SCHEDULED'
+        )
+          wipe();
+        return result;
+      } catch (error) {
+        if (error instanceof ApiError && [401, 403, 404].includes(error.status))
+          wipe();
+        throw error;
+      }
     },
     enabled: live.enabled,
     refetchInterval: 5000,
@@ -81,6 +91,7 @@ export function PassDetail({
         gateSetupSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled && view === 'GUARD',
     staleTime: 0,
@@ -95,6 +106,8 @@ export function PassDetail({
         gatePath(societyId, `passes/${id}/${intent.kind}`),
         guestPassCommandSchema,
         intent.body,
+        undefined,
+        userId,
       ),
     onSuccess: async () => {
       saved.current = null;
@@ -116,6 +129,9 @@ export function PassDetail({
       await query.refetch();
     },
   });
+  const accessUnavailable =
+    query.error instanceof ApiError &&
+    [401, 403, 404].includes(query.error.status);
   const p = query.data?.pass,
     fresh =
       live.enabled &&
@@ -142,6 +158,8 @@ export function PassDetail({
         gatePath(societyId, `passes/${id}/code`),
         guestPassRevealSchema,
         {},
+        undefined,
+        userId,
       );
       if (generation === epoch.current && AppState.currentState === 'active')
         setCode(result.code);
@@ -176,7 +194,7 @@ export function PassDetail({
     action.mutate(intent);
   }
   if (query.isPending) return <Loading label="Checking guest pass…" />;
-  if (!p)
+  if (accessUnavailable || !p)
     return (
       <>
         <ErrorMessage message={messageOf(query.error)} />

@@ -6,6 +6,7 @@ import {
 } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import Apply from '../app/(member)/apply';
 import Community from '../app/(member)/community';
 import Invitation from '../app/(member)/invitation';
 import { AdminReviews } from '../features/onboarding/admin-reviews';
@@ -85,6 +86,8 @@ it('shows pending status without a society dashboard and permits withdrawal', as
       '/onboarding/applications/app1/withdraw',
       expect.anything(),
       {},
+      undefined,
+      'u1',
     ),
   );
 });
@@ -117,6 +120,8 @@ it('previews the invited flat and requires explicit acceptance', async () => {
     '/onboarding/invitation-accept',
     expect.anything(),
     { token: 'A'.repeat(43) },
+    undefined,
+    'u1',
   );
 });
 it('requires confirmation before an admin approval', async () => {
@@ -133,6 +138,8 @@ it('requires confirmation before an admin approval', async () => {
       '/societies/s1/admin/applications/app1/decision',
       expect.anything(),
       { decision: 'APPROVE' },
+      undefined,
+      'admin',
     ),
   );
 });
@@ -192,5 +199,114 @@ it('renders invitation management without raw native text and shows the one-time
       flatId: 'f1',
       relationship: 'TENANT',
     },
+    undefined,
+    'admin',
+  );
+});
+
+const laterFlat = { id: 'f501', tower: 'Z', label: '501' };
+const firstPage = Array.from({ length: 500 }, (_, i) => ({
+  id: `f${i + 1}`,
+  tower: 'A',
+  label: String(i + 1),
+}));
+it('lets an applicant load and select a flat beyond the first 500', async () => {
+  mockApi.mockImplementation(
+    (path: string, _schema: unknown, body: { cursor?: string }) =>
+      Promise.resolve(
+        path === '/onboarding/society-lookup'
+          ? {
+              society,
+              flats: body.cursor ? [laterFlat] : firstPage,
+              nextCursor: body.cursor ? null : 'page2',
+            }
+          : pending,
+      ),
+  );
+  renderWithQuery(<Apply />);
+  fireEvent.changeText(screen.getByLabelText('Society code'), 'ABCDEFGHIJKL');
+  fireEvent.press(screen.getByRole('button', { name: 'Find my society' }));
+  await screen.findByLabelText('Search tower or flat');
+  fireEvent.changeText(screen.getByLabelText('Search tower or flat'), 'Z 501');
+  expect(screen.queryByText(/Check with the society office/)).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Load more flats' }));
+  fireEvent.press(await screen.findByRole('radio', { name: 'Z · 501' }));
+  fireEvent.changeText(screen.getByLabelText('Full name'), 'New Resident');
+  fireEvent.press(screen.getByRole('button', { name: 'Send application' }));
+  await waitFor(() =>
+    expect(mockApi).toHaveBeenCalledWith(
+      '/societies/s1/applications',
+      expect.anything(),
+      {
+        name: 'New Resident',
+        flatId: 'f501',
+        relationship: 'TENANT',
+        societyCode: 'ABCDEFGHIJKL',
+      },
+      undefined,
+      'u1',
+    ),
+  );
+  expect(mockApi).toHaveBeenCalledWith(
+    '/onboarding/society-lookup',
+    expect.anything(),
+    { code: 'ABCDEFGHIJKL', cursor: 'page2' },
+    expect.any(AbortSignal),
+    'u1',
+  );
+});
+it('lets an admin retry a failed page and invite a flat beyond the first 500', async () => {
+  let failed = false;
+  mockApi.mockImplementation(
+    (path: string, _schema: unknown, body: unknown) => {
+      if (path.includes('/flats')) {
+        if (path.includes('?') && !failed) {
+          failed = true;
+          return Promise.reject(new Error('Page unavailable'));
+        }
+        return Promise.resolve({
+          flats: path.includes('?') ? [laterFlat] : firstPage,
+          nextCursor: path.includes('?') ? null : 'page2',
+        });
+      }
+      return Promise.resolve(
+        body
+          ? { token: 'C'.repeat(43), expiresAt: '2026-10-17T10:00:00Z' }
+          : { items: [], nextCursor: null },
+      );
+    },
+  );
+  renderWithQuery(
+    <AdminInvitations
+      userId="admin"
+      societyId="s1"
+      societyName="Portl Gardens"
+    />,
+  );
+  await screen.findByLabelText('Search tower or flat');
+  fireEvent.changeText(screen.getByLabelText('Search tower or flat'), 'Z 501');
+  fireEvent.press(screen.getByRole('button', { name: 'Load more flats' }));
+  await screen.findByText('Page unavailable');
+  fireEvent.press(screen.getByRole('button', { name: 'Load more flats' }));
+  fireEvent.press(await screen.findByRole('radio', { name: 'Z · 501' }));
+  fireEvent.changeText(
+    screen.getByLabelText('Resident email'),
+    'invitee@example.com',
+  );
+  fireEvent.press(screen.getByRole('button', { name: 'Create invitation' }));
+  await screen.findByText('C'.repeat(43));
+  expect(mockApi).toHaveBeenCalledWith(
+    '/societies/s1/admin/invitations',
+    expect.anything(),
+    { email: 'invitee@example.com', flatId: 'f501', relationship: 'TENANT' },
+    undefined,
+    'admin',
+  );
+  expect(mockApi).toHaveBeenCalledWith(
+    '/societies/s1/admin/flats?cursor=page2',
+    expect.anything(),
+    undefined,
+    expect.any(AbortSignal),
+    'admin',
   );
 });

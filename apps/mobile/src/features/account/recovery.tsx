@@ -107,7 +107,7 @@ export function AdminRecovery({ userId }: { userId: string }) {
       setOtp('');
       setTotpCode('');
       setConfirmation('');
-      await forgetSession();
+      await forgetSession(userId);
     } catch (e) {
       if (generation.current !== currentGeneration) return;
       setError(

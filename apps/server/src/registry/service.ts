@@ -41,6 +41,49 @@ async function validFlat(tx: Tx, societyId: string, flatId: string) {
   if (!flat) throw unavailable();
   return flat;
 }
+async function flatPage(tx: Tx, societyId: string, cursor?: string) {
+  const anchor = cursor
+    ? await tx.flat.findFirst({
+        where: { id: cursor, societyId, archived: false },
+        include: { tower: true },
+      })
+    : null;
+  if (cursor && !anchor)
+    throw new DomainError(
+      404,
+      'INVALID_CURSOR',
+      'Refresh the flat list and try again',
+    );
+  const rows = await tx.flat.findMany({
+    where: {
+      societyId,
+      archived: false,
+      ...(anchor
+        ? {
+            OR: [
+              { tower: { name: { gt: anchor.tower.name } } },
+              {
+                tower: { name: anchor.tower.name },
+                label: { gt: anchor.label },
+              },
+              {
+                tower: { name: anchor.tower.name },
+                label: anchor.label,
+                id: { gt: anchor.id },
+              },
+            ],
+          }
+        : {}),
+    },
+    include: { tower: true },
+    orderBy: [{ tower: { name: 'asc' } }, { label: 'asc' }, { id: 'asc' }],
+    take: 501,
+  });
+  return {
+    flats: rows.slice(0, 500).map(flatView),
+    nextCursor: rows.length > 500 ? rows[499]!.id : null,
+  };
+}
 async function pendingInvitation(tx: Tx, actor: Actor, token: string) {
   const tokenHash = hash(token);
   await tx.$queryRaw`SELECT set_config('portl.invite_hash', ${tokenHash}, true)`;
@@ -106,7 +149,7 @@ export function registryService(db: PrismaClient) {
         }
         return result;
       }),
-    lookup: (actor: Actor, code: string) =>
+    lookup: (actor: Actor, code: string, cursor?: string) =>
       withActor(db, actor, async (tx) => {
         await tx.$queryRaw`SELECT set_config('portl.join_hash', ${hash(code)}, true)`;
         const society = await tx.society.findFirst({
@@ -119,13 +162,10 @@ export function registryService(db: PrismaClient) {
             'Check the society code with your society office',
           );
         await scope(tx, society.id);
-        const flats = await tx.flat.findMany({
-          where: { societyId: society.id, archived: false },
-          include: { tower: true },
-          orderBy: [{ tower: { name: 'asc' } }, { label: 'asc' }],
-          take: 500,
-        });
-        return { society: societyView(society), flats: flats.map(flatView) };
+        return {
+          society: societyView(society),
+          ...(await flatPage(tx, society.id, cursor)),
+        };
       }),
     preview: (actor: Actor, token: string) =>
       withActor(db, actor, async (tx) => {
@@ -238,16 +278,10 @@ export function registryService(db: PrismaClient) {
         await audit(tx, actor, row.societyId, 'APPLICATION_WITHDRAWN', id);
         return { success: true };
       }),
-    adminFlats: (actor: Actor, societyId: string) =>
+    adminFlats: (actor: Actor, societyId: string, cursor?: string) =>
       withActor(db, actor, async (tx) => {
         await requireAdmin(tx, actor, societyId);
-        const rows = await tx.flat.findMany({
-          where: { societyId, archived: false },
-          include: { tower: true },
-          take: 500,
-          orderBy: [{ tower: { name: 'asc' } }, { label: 'asc' }],
-        });
-        return { flats: rows.map(flatView) };
+        return flatPage(tx, societyId, cursor);
       }),
     invite: (actor: Actor, societyId: string, input: InvitationInput) =>
       withActor(db, actor, async (tx) => {

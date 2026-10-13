@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import {
   applicationInput,
   applicationSchema,
@@ -24,7 +24,7 @@ import {
 import { FlatPicker } from '../../features/onboarding/flat-picker';
 
 export default function Apply() {
-  const { refresh } = useSession();
+  const { me, refresh } = useSession();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [flatId, setFlatId] = useState('');
@@ -34,7 +34,31 @@ export default function Apply() {
   const [error, setError] = useState('');
   const lookup = useMutation({
     mutationFn: (value: string) =>
-      api('/onboarding/society-lookup', lookupSchema, { code: value }),
+      api(
+        '/onboarding/society-lookup',
+        lookupSchema,
+        { code: value },
+        undefined,
+        me?.user.id,
+      ),
+  });
+  const flats = useInfiniteQuery({
+    queryKey: ['application-flats', me?.user.id, lookup.data?.society.id, code],
+    enabled: !!lookup.data && !!me,
+    initialPageParam: null as string | null,
+    initialData: lookup.data
+      ? { pages: [lookup.data], pageParams: [null] }
+      : undefined,
+    staleTime: 60_000,
+    queryFn: ({ pageParam, signal }) =>
+      api(
+        '/onboarding/society-lookup',
+        lookupSchema,
+        { code, ...(pageParam ? { cursor: pageParam } : {}) },
+        signal,
+        me?.user.id,
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
   const application = useMutation({
     mutationFn: (input: ReturnType<typeof applicationInput.parse>) =>
@@ -42,6 +66,8 @@ export default function Apply() {
         `/societies/${lookup.data!.society.id}/applications`,
         applicationSchema,
         input,
+        undefined,
+        me?.user.id,
       ),
     onSuccess: async () => {
       await refresh();
@@ -135,7 +161,15 @@ export default function Apply() {
             editable={!application.isPending}
           />
           <FlatPicker
-            flats={lookup.data.flats}
+            flats={
+              flats.data?.pages.flatMap((page) => page.flats) ??
+              lookup.data.flats
+            }
+            hasMore={flats.hasNextPage}
+            loadingMore={flats.isFetchingNextPage}
+            loadError={flats.error ? messageOf(flats.error) : ''}
+            onLoadMore={() => void flats.fetchNextPage()}
+            onRefresh={() => void flats.refetch()}
             value={flatId}
             onChange={setFlatId}
           />

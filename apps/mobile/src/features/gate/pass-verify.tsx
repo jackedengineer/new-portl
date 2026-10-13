@@ -70,6 +70,7 @@ export function PassVerify({
         gateSetupSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled,
     staleTime: 0,
@@ -93,6 +94,8 @@ export function PassVerify({
         gatePath(societyId, 'passes/verify'),
         guestPassDetailSchema,
         { code: parsed.data, gateId: selected },
+        undefined,
+        userId,
       );
       if (epoch.current === generation && AppState.currentState === 'active')
         setVerified({
@@ -128,6 +131,8 @@ export function PassVerify({
         gatePath(societyId, `passes/${intent.id}/entry`),
         guestPassCommandSchema,
         intent.body,
+        undefined,
+        userId,
       );
       await client.invalidateQueries({ queryKey: gateKey(userId, societyId) });
       if (generation === epoch.current) {

@@ -114,7 +114,7 @@ export default function Account() {
                       undefined,
                       me.user.id,
                     );
-                    if (session.current) await forgetSession();
+                    if (session.current) await forgetSession(me.user.id);
                     else await sessions.refetch();
                   })
                 }

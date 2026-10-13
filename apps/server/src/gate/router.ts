@@ -60,6 +60,13 @@ export function gateRouter(
     });
     if (!session?.user.emailVerified)
       throw new DomainError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    const expectedUserId = req.get('x-portl-expected-user');
+    if (expectedUserId && expectedUserId !== session.user.id)
+      throw new DomainError(
+        401,
+        'SESSION_CHANGED',
+        'Your session changed. Please try again.',
+      );
     res.locals.actor = {
       userId: session.user.id,
       email: session.user.email,

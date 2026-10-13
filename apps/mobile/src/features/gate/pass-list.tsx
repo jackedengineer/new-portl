@@ -6,7 +6,7 @@ import {
   type GateView,
   type GuestPassFilter,
 } from '@portl/contracts';
-import { api, messageOf } from '../../lib/api';
+import { api, ApiError, messageOf } from '../../lib/api';
 import { Button, Copy, ErrorMessage, Loading, Row } from '../../components/ui';
 import { gateKey, gatePath, useLiveGate } from './live';
 import { PassCard } from './pass-card';
@@ -36,16 +36,21 @@ export function PassList({
         guestPassListSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled,
     refetchInterval: 5000,
     staleTime: 0,
   });
+  const accessUnavailable =
+    query.error instanceof ApiError &&
+    [401, 403, 404].includes(query.error.status);
   return (
     <>
       {view === 'RESIDENT' && (
         <Button
           label="Create guest pass"
+          disabled={!live.enabled || !!query.error}
           onPress={() =>
             router.push({
               pathname: '/create-guest-pass',
@@ -57,6 +62,7 @@ export function PassList({
       {view === 'GUARD' && (
         <Button
           label="Verify guest pass"
+          disabled={!live.enabled || !!query.error}
           onPress={() =>
             router.push({
               pathname: '/verify-guest-pass',
@@ -79,6 +85,7 @@ export function PassList({
                     : 'History'
               }
               variant={f === filter ? 'primary' : 'secondary'}
+              disabled={accessUnavailable}
               onPress={() => {
                 setFilter(f);
                 setPages([undefined]);
@@ -96,29 +103,31 @@ export function PassList({
       {!query.isPending && !query.error && !query.data?.items.length && (
         <Copy>No {filter.toLowerCase()} guest passes yet.</Copy>
       )}
-      {query.data?.items.map((p) => (
-        <PassCard key={p.id} pass={p}>
-          <Button
-            label={`View ${p.visitorName}`}
-            variant="secondary"
-            onPress={() =>
-              router.push({
-                pathname: '/guest-pass',
-                params: { societyId, id: p.id, view },
-              })
-            }
-          />
-        </PassCard>
-      ))}
+      {!accessUnavailable &&
+        query.data?.items.map((p) => (
+          <PassCard key={p.id} pass={p}>
+            <Button
+              label={`View ${p.visitorName}`}
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/guest-pass',
+                  params: { societyId, id: p.id, view },
+                })
+              }
+            />
+          </PassCard>
+        ))}
       <Row>
         {pages.length > 1 && (
           <Button
             label="Previous page"
             variant="secondary"
+            disabled={accessUnavailable}
             onPress={() => setPages((p) => p.slice(0, -1))}
           />
         )}
-        {!!query.data?.nextCursor && (
+        {!accessUnavailable && !!query.data?.nextCursor && (
           <Button
             label="Next page"
             variant="secondary"

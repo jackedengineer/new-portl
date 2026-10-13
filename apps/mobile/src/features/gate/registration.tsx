@@ -51,6 +51,7 @@ export function Registration({
         gateSetupSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled,
     staleTime: 0,
@@ -58,7 +59,13 @@ export function Registration({
   });
   const submit = useMutation({
     mutationFn: (input: ArrivalInput) =>
-      api(gatePath(societyId, 'requests'), gateCommandSchema, input),
+      api(
+        gatePath(societyId, 'requests'),
+        gateCommandSchema,
+        input,
+        undefined,
+        userId,
+      ),
     onSuccess: async (result) => {
       setIntent(null);
       await client.invalidateQueries({ queryKey: gateKey(userId, societyId) });
