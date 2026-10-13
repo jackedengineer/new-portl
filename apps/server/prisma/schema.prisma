@@ -18,6 +18,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   twoFactorEnabled Boolean @default(false)
+  policy AccountPolicy?
+  deletionRequestedAt DateTime?
+  deletionChallenges DeletionChallenge[]
+  guardAssignments GuardAssignment[]
+  requestRecipients RequestRecipient[]
   twoFactor TwoFactor?
   totpUses AdminTotpUse[]
   notifications Notification[]
@@ -311,6 +316,7 @@ model Gate {
   @@schema("portl_registry")
 }
 model GuardAssignment {
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
   grantVersion Int @default(1)
   id String @id @default(uuid())
   societyId String
@@ -370,6 +376,7 @@ model VisitorRequest {
   @@schema("portl_gate")
 }
 model RequestRecipient {
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
   id String @id @default(uuid())
   societyId String
   requestId String
@@ -528,4 +535,41 @@ model NoticePublication {
  notice Notice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
  capturedAt DateTime @default(now())
  @@schema("portl_community")
+}
+
+model AccountPolicy {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version String
+  adult Boolean
+  acceptedAt DateTime @default(now())
+  @@schema("portl_auth")
+}
+model DeletionChallenge {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email String
+  digest String
+  receiptHash String @unique
+  attempts Int @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([expiresAt])
+  @@schema("portl_auth")
+}
+model AccountDeletion {
+  id String @id
+  userId String? @unique
+  subjectHash String
+  emailHash String?
+  receiptHash String @unique
+  status String @default("PENDING")
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  @@index([status, nextAttemptAt])
+  @@schema("portl_auth")
 }

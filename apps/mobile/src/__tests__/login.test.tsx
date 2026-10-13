@@ -53,6 +53,7 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 it('validates email before sending and passes no personal data in navigation', async () => {
   render(<Login />);
+  fireEvent.press(screen.getByRole('checkbox'));
   fireEvent.press(screen.getByRole('button', { name: 'Continue with email' }));
   expect(mockSend).not.toHaveBeenCalled();
   expect(screen.getByText('Enter a valid email address.')).toBeTruthy();
@@ -76,6 +77,7 @@ it('validates email before sending and passes no personal data in navigation', a
 it('keeps the user on login when email delivery fails', async () => {
   mockSend.mockResolvedValue({ error: { status: 503 } });
   render(<Login />);
+  fireEvent.press(screen.getByRole('checkbox'));
   fireEvent.changeText(screen.getByLabelText('Email address'), 'a@example.com');
   fireEvent.press(screen.getByRole('button', { name: 'Continue with email' }));
   await waitFor(() =>
@@ -97,6 +99,11 @@ it('verifies a complete OTP and revalidates server identity before navigation', 
   expect(mockVerify).toHaveBeenCalledWith({
     email: 'a@example.com',
     otp: '123456',
+    policyAcceptance: {
+      adult: true,
+      termsVersion: '2026-10-13',
+      privacyVersion: '2026-10-13',
+    },
   });
   expect(mockReplace).toHaveBeenCalledWith('/community');
 });
@@ -136,4 +143,22 @@ it('enforces resend cooldown and expires the code after five minutes', () => {
     screen.getByRole('button', { name: 'Verify & continue' }).props
       .accessibilityState.disabled,
   ).toBe(true);
+});
+
+it('keeps age and policy acceptance unchecked and blocks sending until explicitly accepted', async () => {
+  render(<Login />);
+  fireEvent.changeText(
+    screen.getByLabelText('Email address'),
+    'adult@example.invalid',
+  );
+  fireEvent.press(screen.getByRole('button', { name: 'Continue with email' }));
+  expect(mockSend).not.toHaveBeenCalled();
+  expect(screen.getByRole('checkbox').props.accessibilityState.checked).toBe(
+    false,
+  );
+  expect(
+    screen.getByText(
+      'Confirm your age and accept the terms and privacy notice.',
+    ),
+  ).toBeTruthy();
 });

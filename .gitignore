@@ -19,3 +19,6 @@ apps/mobile/ios/
 apps/server/src/generated/
 .local/
 google-services.json
+
+# Private deletion tombstones; production must use a durable external volume.
+.private/

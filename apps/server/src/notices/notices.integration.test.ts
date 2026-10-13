@@ -61,7 +61,14 @@ async function login() {
           // Keep this suite's OTP budgets separate from gate/registry fixtures.
           'x-portl-client-ip': `192.0.2.${users.length + 200}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ...body,
+          policyAcceptance: {
+            adult: true,
+            termsVersion: '2026-10-13',
+            privacyVersion: '2026-10-13',
+          },
+        }),
       }),
     );
   expect(

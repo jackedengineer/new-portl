@@ -29,6 +29,12 @@ export function withActor<T>(
 ) {
   return db.$transaction(
     async (tx) => {
+      // Serialize in-flight domain work with account/session revocation and erasure.
+      const active = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT u.id FROM portl_auth."User" u JOIN portl_auth."Session" s ON s."userId"=u.id WHERE u.id=${actor.userId} AND s.id=${actor.sessionId} AND u."deletionRequestedAt" IS NULL AND s."expiresAt">clock_timestamp() FOR SHARE OF u,s`;
+      if (!active.length)
+        throw new DomainError(401, 'UNAUTHENTICATED', 'Sign in to continue');
       await tx.$queryRaw`SELECT set_config('portl.user_id', ${actor.userId}, true),
       set_config('portl.session_id', ${actor.sessionId}, true), set_config('portl.email', ${actor.email}, true),
       set_config('portl.society_id', '', true), set_config('portl.invite_hash', '', true), set_config('portl.join_hash', '', true)`;

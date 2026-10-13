@@ -54,6 +54,7 @@ async function call(
   path: string,
   body?: Record<string, unknown>,
   cookie?: string,
+  expectedUserId?: string,
 ) {
   const response = await auth.handler(
     new Request(`http://localhost:3000/api/auth${path}`, {
@@ -63,8 +64,20 @@ async function call(
         'content-type': 'application/json',
         'x-portl-client-ip': `203.0.113.${++ip}`,
         ...(cookie ? { cookie } : {}),
+        ...(expectedUserId ? { 'x-portl-expected-user': expectedUserId } : {}),
       },
-      ...(body ? { body: JSON.stringify(body) } : {}),
+      ...(body
+        ? {
+            body: JSON.stringify({
+              ...body,
+              policyAcceptance: {
+                adult: true,
+                termsVersion: '2026-10-13',
+                privacyVersion: '2026-10-13',
+              },
+            }),
+          }
+        : {}),
     }),
   );
   return response;
@@ -333,7 +346,15 @@ describe('email OTP with PostgreSQL', () => {
       const signedIn = await request(app)
         .post('/api/auth/sign-in/email-otp')
         .set('expo-origin', origin)
-        .send({ email, otp: sent.get(email) });
+        .send({
+          email,
+          otp: sent.get(email),
+          policyAcceptance: {
+            adult: true,
+            termsVersion: '2026-10-13',
+            privacyVersion: '2026-10-13',
+          },
+        });
       expect(signedIn.status).toBe(200);
       const cookies = signedIn.headers['set-cookie'] as unknown as string[];
       expect(
@@ -458,4 +479,128 @@ describe('email OTP with PostgreSQL', () => {
       (await request(app).get('/v1/me').set('cookie', cookie)).status,
     ).toBe(401);
   });
+});
+
+it('verifies both mailboxes before changing email, preserves identity and revokes all sessions', async () => {
+  const oldEmail = identity(),
+    newEmail = identity();
+  const signed = await call('/sign-in/email-otp', {
+    email: oldEmail,
+    otp: await issue(oldEmail),
+  });
+  const cookie = signed.headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+  const user = await db.user.findUniqueOrThrow({ where: { email: oldEmail } });
+  expect(
+    (
+      await call(
+        '/email-otp/request-email-change',
+        { newEmail, otp: '000000' },
+        cookie,
+        user.id,
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await call(
+        '/email-otp/send-verification-otp',
+        { email: oldEmail, type: 'email-verification' },
+        cookie,
+        'wrong-user',
+      )
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await call(
+        '/email-otp/send-verification-otp',
+        { email: oldEmail, type: 'email-verification' },
+        cookie,
+        user.id,
+      )
+    ).status,
+  ).toBe(200);
+  const currentCode = sent.get(oldEmail)!;
+  // The failed request consumed the recipient cooldown; advance only this test's bucket.
+  await db.otpThrottle.update({
+    where: {
+      key: emailThrottleKey(
+        'portl-test-only-secret-with-at-least-32-characters',
+        newEmail,
+        'cooldown',
+      ),
+    },
+    data: { resetAt: new Date(0) },
+  });
+  expect(
+    (
+      await call(
+        '/email-otp/request-email-change',
+        { newEmail, otp: currentCode },
+        cookie,
+        user.id,
+      )
+    ).status,
+  ).toBe(200);
+  expect(await db.user.findUnique({ where: { email: newEmail } })).toBeNull();
+  const nextCode = sent.get(newEmail)!;
+  expect(nextCode).toMatch(/^\d{6}$/);
+  expect(
+    (
+      await call(
+        '/email-otp/change-email',
+        { newEmail, otp: nextCode },
+        cookie,
+        user.id,
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (await db.user.findUniqueOrThrow({ where: { email: newEmail } })).id,
+  ).toBe(user.id);
+  expect(await db.session.count({ where: { userId: user.id } })).toBe(0);
+  expect(
+    await auth.accountSession({ headers: new Headers({ cookie }) }),
+  ).toBeNull();
+  expect(
+    (
+      await call(
+        '/email-otp/change-email',
+        { newEmail, otp: nextCode },
+        cookie,
+        user.id,
+      )
+    ).status,
+  ).toBe(401);
+});
+it('requires explicit current policy and adult attestation before creating an account', async () => {
+  const email = identity(),
+    otp = await issue(email);
+  for (const policyAcceptance of [
+    undefined,
+    { adult: false, termsVersion: '2026-10-13', privacyVersion: '2026-10-13' },
+    { adult: true, termsVersion: 'old', privacyVersion: 'old' },
+  ]) {
+    const response = await auth.handler(
+      new Request('http://localhost:3000/api/auth/sign-in/email-otp', {
+        method: 'POST',
+        headers: {
+          origin: 'portl://',
+          'content-type': 'application/json',
+          'x-portl-client-ip': `203.0.113.${++ip}`,
+        },
+        body: JSON.stringify({ email, otp, policyAcceptance }),
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(await db.user.findUnique({ where: { email } })).toBeNull();
+  }
+  expect((await call('/sign-in/email-otp', { email, otp })).status).toBe(200);
+  const user = await db.user.findUniqueOrThrow({ where: { email } });
+  expect(
+    await db.accountPolicy.findUnique({ where: { userId: user.id } }),
+  ).toMatchObject({ version: '2026-10-13', adult: true });
 });

@@ -3,6 +3,9 @@ import pg from 'pg';
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
   await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_auth.revoke_account_devices(text), portl_auth.revoke_session_devices(text,text) TO ${who}`,
+  );
+  await client.query(
     `GRANT EXECUTE ON FUNCTION portl_registry.is_current_resident(text),portl_registry.active_admin(text) TO ${who}`,
   );
   await client.query(
@@ -68,6 +71,9 @@ export async function grantRuntime(client: pg.Client, role: string) {
     'TwoFactor',
     'AdminAssurance',
     'AdminTotpUse',
+    'AccountPolicy',
+    'DeletionChallenge',
+    'AccountDeletion',
   ]) {
     await client.query(
       `GRANT SELECT, INSERT, UPDATE, DELETE ON portl_auth.${pg.escapeIdentifier(table)} TO ${who}`,

@@ -1,3 +1,6 @@
+import { POLICY_VERSION } from '@portl/contracts';
+import { accountRouter } from './account/router.js';
+import { publicAccountRouter } from './account/public.js';
 import type { GateSignal } from '@portl/contracts';
 import { notificationRouter } from './notifications/router.js';
 import { noticeRouter } from './notices/router.js';
@@ -128,8 +131,10 @@ export function createApp(logger?: Logger, services?: AppServices) {
       },
     );
 
+    app.use(publicAccountRouter(services.auth, services.baseURL));
+    app.use('/v1/account', accountRouter(services.auth));
     app.get('/v1/me', async (req, res) => {
-      const session = await services.auth.api.getSession({
+      const session = await services.auth.accountSession({
         headers: fromNodeHeaders(req.headers),
       });
       if (!session) {
@@ -143,12 +148,19 @@ export function createApp(logger?: Logger, services?: AppServices) {
         return;
       }
       const { id, email, name, emailVerified } = session.user;
-      const memberships = await registryService(services.db).memberships({
-        userId: id,
-        email,
-        sessionId: session.session.id,
-        requestId: String(res.getHeader('x-request-id')),
+      const policy = await services.db.accountPolicy.findUnique({
+        where: { userId: id },
       });
+      const policyRequired =
+        !policy?.adult || policy.version !== POLICY_VERSION;
+      const memberships = policyRequired
+        ? []
+        : await registryService(services.db).memberships({
+            userId: id,
+            email,
+            sessionId: session.session.id,
+            requestId: String(res.getHeader('x-request-id')),
+          });
       const assurance = await services.db.adminAssurance.findUnique({
         where: { sessionId: session.session.id },
       });
@@ -158,6 +170,7 @@ export function createApp(logger?: Logger, services?: AppServices) {
       });
       res.json({
         user: { id, email, name, emailVerified },
+        policyRequired,
         memberships,
         onboardingRequired: memberships.length === 0,
         adminAssuredUntil:

@@ -1,3 +1,7 @@
+import { checkEmailChange } from '../account/email-auth.js';
+import { POLICY_VERSION, policyAcceptanceInput } from '@portl/contracts';
+import { accountService } from '../account/service.js';
+import { accountProof } from '../account/proof.js';
 import { createHmac } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -17,12 +21,16 @@ import { allowEmailSend } from './throttle.js';
 export type OtpDelivery = (message: {
   email: string;
   otp: string;
+  purpose?:
+    'sign-in' | 'delete-account' | 'verify-current-email' | 'change-email';
 }) => Promise<void>;
 
 export const authRoutes = new Map([
   ['/email-otp/send-verification-otp', 'POST'],
   ['/sign-in/email-otp', 'POST'],
   ['/get-session', 'GET'],
+  ['/email-otp/request-email-change', 'POST'],
+  ['/email-otp/change-email', 'POST'],
   ['/sign-out', 'POST'],
   ['/two-factor/verify-totp', 'POST'],
 ]);
@@ -32,6 +40,11 @@ export function createAuth(
   env: AuthEnv,
   deliver: OtpDelivery,
 ) {
+  const accounts = accountService(
+    db,
+    accountProof(env.BETTER_AUTH_SECRET),
+    deliver,
+  );
   const delivery = new AsyncLocalStorage<{ failed: boolean }>();
   const digest = (otp: string) =>
     createHmac('sha256', env.BETTER_AUTH_SECRET)
@@ -88,13 +101,52 @@ export function createAuth(
               message: 'Invalid email address',
             });
           ctx.body.email = email.data;
+          if (
+            ctx.path === '/sign-in/email-otp' &&
+            !policyAcceptanceInput.safeParse(ctx.body.policyAcceptance).success
+          )
+            throw new APIError('BAD_REQUEST', {
+              message:
+                'Confirm you are 18 or older and accept the current terms and privacy notice',
+            });
+          if (ctx.path === '/sign-in/email-otp') {
+            const user = await db.user.findUnique({
+              where: { email: email.data },
+              select: { deletionRequestedAt: true },
+            });
+            const erased = await db.accountDeletion.findFirst({
+              where: {
+                emailHash: accountProof(env.BETTER_AUTH_SECRET).email(
+                  email.data,
+                ),
+                OR: [
+                  { status: 'PENDING' },
+                  { completedAt: { gt: new Date(Date.now() - 600000) } },
+                ],
+              },
+              select: { id: true },
+            });
+            if (user?.deletionRequestedAt || erased)
+              throw new APIError('FORBIDDEN', {
+                message: 'Account unavailable. Please try again later.',
+              });
+          }
           if (ctx.path === '/email-otp/send-verification-otp') {
-            if (ctx.body.type !== 'sign-in')
+            if (
+              ctx.body.type !== 'sign-in' &&
+              ctx.body.type !== 'email-verification'
+            )
               throw new APIError('BAD_REQUEST', {
                 message: 'Invalid OTP purpose',
               });
             if (
-              !(await allowEmailSend(db, env.BETTER_AUTH_SECRET, email.data))
+              !(await allowEmailSend(
+                db,
+                env.BETTER_AUTH_SECRET,
+                ctx.body.type === 'email-verification'
+                  ? `verify-current:${email.data}`
+                  : email.data,
+              ))
             ) {
               throw new APIError('TOO_MANY_REQUESTS', {
                 message: 'Please wait before requesting another code',
@@ -117,14 +169,18 @@ export function createAuth(
       expo(),
       twoFactor({ issuer: 'Portl', allowPasswordless: true }),
       emailOTP({
+        changeEmail: { enabled: true, verifyCurrentEmail: true },
         otpLength: 6,
         expiresIn: 300,
         allowedAttempts: 3,
         disableSignUp: false,
         resendStrategy: 'rotate',
         storeOTP: { hash: async (otp) => digest(otp) },
-        async sendVerificationOTP({ email, otp }) {
-          const identifier = `sign-in-otp-${email}`;
+        async sendVerificationOTP({ email, otp, type }, ctx) {
+          const identifier =
+            type === 'change-email'
+              ? `change-email-otp-${ctx?.context.session?.user.email.toLowerCase()}-${email}`
+              : `${type}-otp-${email}`;
           const hashPrefix = `${digest(otp)}:`;
           let expiresAt: Date | undefined;
           try {
@@ -134,7 +190,16 @@ export function createAuth(
             });
             if (!challenge) throw new Error('Email challenge unavailable');
             expiresAt = challenge.expiresAt;
-            await deliver({ email, otp });
+            await deliver({
+              email,
+              otp,
+              purpose:
+                type === 'email-verification'
+                  ? 'verify-current-email'
+                  : type === 'change-email'
+                    ? 'change-email'
+                    : 'sign-in',
+            });
           } catch {
             const attempt = delivery.getStore();
             if (attempt) attempt.failed = true;
@@ -156,12 +221,44 @@ export function createAuth(
     ],
   });
   return {
-    api: { getSession: auth.api.getSession },
+    accounts,
+    accountSession: async (input: { headers: Headers }) => {
+      const session = await auth.api.getSession(input);
+      if (!session) return null;
+      const user = await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { deletionRequestedAt: true },
+      });
+      return user && !user.deletionRequestedAt ? session : null;
+    },
+    api: {
+      getSession: async (input: { headers: Headers }) => {
+        const session = await auth.api.getSession(input);
+        if (!session) return null;
+        const policy = await db.accountPolicy.findFirst({
+          where: {
+            userId: session.user.id,
+            version: POLICY_VERSION,
+            adult: true,
+            user: { deletionRequestedAt: null },
+          },
+        });
+        return policy ? session : null;
+      },
+    },
     acceptsOrigin: (origin: string) => env.TRUSTED_ORIGINS.includes(origin),
     budget: (subject: string, bucket: string, max: number, seconds: number) =>
       consumeBudget(db, env.BETTER_AUTH_SECRET, subject, bucket, max, seconds),
     handler(request: Request) {
       return delivery.run({ failed: false }, async () => {
+        const emailFailure = await checkEmailChange(
+          request,
+          db,
+          env.BETTER_AUTH_SECRET,
+          env.TRUSTED_ORIGINS,
+          auth.api.getSession,
+        );
+        if (emailFailure) return emailFailure;
         let adminSession: Awaited<ReturnType<typeof auth.api.getSession>> =
           null;
         let codeDigest = '';
@@ -233,7 +330,47 @@ export function createAuth(
             `totp:${adminSession.user.id}:${input.data.code}`,
           );
         }
+        const provenEmail = new URL(request.url).pathname.endsWith(
+          '/sign-in/email-otp',
+        )
+          ? String(
+              (
+                await request
+                  .clone()
+                  .json()
+                  .catch(() => ({}))
+              ).email,
+            ).toLowerCase()
+          : null;
         const response = await auth.handler(request);
+        if (
+          new URL(request.url).pathname.endsWith('/sign-in/email-otp') &&
+          response.ok
+        ) {
+          const data = await response.clone().json();
+          const session =
+            typeof data.token === 'string'
+              ? await db.session.findUnique({ where: { token: data.token } })
+              : null;
+          if (session) {
+            const current = await db.user.findUnique({
+              where: { id: session.userId },
+              select: { email: true, deletionRequestedAt: true },
+            });
+            if (
+              !current ||
+              current.deletionRequestedAt ||
+              current.email !== provenEmail
+            ) {
+              await db.session.deleteMany({ where: { id: session.id } });
+              return Response.json(
+                { message: 'Account changed. Sign in again.' },
+                { status: 401 },
+              );
+            }
+            await accounts.accept(session.userId, session.id);
+          }
+        }
         if (adminSession && response.ok) {
           await db.adminTotpUse.deleteMany({
             where: {
