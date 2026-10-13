@@ -1,3 +1,4 @@
+import { adminRecoveryService } from '../recovery/service.js';
 import { checkEmailChange } from '../account/email-auth.js';
 import { POLICY_VERSION, policyAcceptanceInput } from '@portl/contracts';
 import { accountService } from '../account/service.js';
@@ -22,7 +23,11 @@ export type OtpDelivery = (message: {
   email: string;
   otp: string;
   purpose?:
-    'sign-in' | 'delete-account' | 'verify-current-email' | 'change-email';
+    | 'sign-in'
+    | 'delete-account'
+    | 'verify-current-email'
+    | 'change-email'
+    | 'admin-recovery';
 }) => Promise<void>;
 
 export const authRoutes = new Map([
@@ -222,6 +227,7 @@ export function createAuth(
   });
   return {
     accounts,
+    recovery: adminRecoveryService(db, env.BETTER_AUTH_SECRET),
     accountSession: async (input: { headers: Headers }) => {
       const session = await auth.api.getSession(input);
       if (!session) return null;

@@ -118,3 +118,4 @@ export * from './administration.ts';
 export * from './gate-live.ts';
 
 export * from './account.ts';
+export * from './recovery.ts';

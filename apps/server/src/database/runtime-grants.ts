@@ -3,6 +3,9 @@ import pg from 'pg';
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
   await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_auth.admin_recovery_view(text,text),portl_auth.complete_admin_recovery(text,text,text,text,boolean,text) TO ${who}`,
+  );
+  await client.query(
     `GRANT EXECUTE ON FUNCTION portl_auth.revoke_account_devices(text), portl_auth.revoke_session_devices(text,text) TO ${who}`,
   );
   await client.query(

@@ -10,6 +10,7 @@ datasource db {
 }
 
 model User {
+  operatorRecoveries OperatorRecovery[]
   id            String    @id
   name          String
   email         String    @unique
@@ -146,6 +147,7 @@ enum ApplicationStatus {
   @@schema("portl_registry")
 }
 model Society {
+  operatorRecoveries OperatorRecovery[]
   directory DirectoryEntry[]
   id String @id @default(uuid())
   name String
@@ -571,5 +573,27 @@ model AccountDeletion {
   attempts Int @default(0)
   nextAttemptAt DateTime @default(now())
   @@index([status, nextAttemptAt])
+  @@schema("portl_auth")
+}
+
+model OperatorRecovery {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  societyId String?
+  society Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  operation String
+  email String
+  operatorId String
+  evidenceRef String
+  otpHash String?
+  encryptedSecret String?
+  expectedFactorHash String?
+  status String @default("PENDING")
+  attempts Int @default(0)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  completedAt DateTime?
+  @@index([userId, createdAt])
   @@schema("portl_auth")
 }

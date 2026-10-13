@@ -1,3 +1,4 @@
+import { recoveryEnrollInput, recoveryConfirmInput } from '@portl/contracts';
 import express from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import {
@@ -104,6 +105,30 @@ export function accountRouter(auth: PortlAuth) {
     await accountBudget(auth, session.user.id, 'account-private', 30, 60);
     res.locals.session = session;
     next();
+  });
+  router.get('/recovery', async (_req, res) => {
+    const session = res.locals.session as NonNullable<
+      Awaited<ReturnType<PortlAuth['accountSession']>>
+    >;
+    res.json(await auth.recovery.status(session.user.id, session.session.id));
+  });
+  router.post('/recovery/enroll', async (req, res) => {
+    const { id } = parseAccount(recoveryEnrollInput, req.body);
+    const session = res.locals.session as NonNullable<
+      Awaited<ReturnType<PortlAuth['accountSession']>>
+    >;
+    res.json(
+      await auth.recovery.enroll(session.user.id, session.session.id, id),
+    );
+  });
+  router.post('/recovery/confirm', async (req, res) => {
+    const input = parseAccount(recoveryConfirmInput, req.body);
+    const session = res.locals.session as NonNullable<
+      Awaited<ReturnType<PortlAuth['accountSession']>>
+    >;
+    res.json(
+      await auth.recovery.confirm(session.user.id, session.session.id, input),
+    );
   });
   router.post('/accept-policy', async (req, res) => {
     parseAccount(policyAcceptanceInput, req.body);
