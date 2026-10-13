@@ -1,0 +1,9 @@
+{
+  "operation": "RESTORE_ADMIN",
+  "targetEmail": "replacement-admin@example.invalid",
+  "societyId": "replace-with-exact-society-id",
+  "operatorId": "replace-with-operator-reference",
+  "evidenceRef": "replace-with-private-verified-case-reference",
+  "identityVerified": false,
+  "societyAuthorityVerified": false
+}

@@ -135,3 +135,9 @@ pnpm exec tsx --env-file=.env scripts/account-restore.ts --offline-restore /abso
 ```
 
 The owner-only `DIRECT_DATABASE_URL` must point at the intended offline restored database. A failed run or remaining pending deletion blocks reopening. Verify erased identities/content absent and unrelated data intact before resuming service. All restorable database backups must be younger than the 90-day recovery-record lifetime; actual provider settings and a restore drill remain public-deployment requirements. The detailed versioned acceptance and operator procedures remain in the external specification set.
+
+## Operator/admin recovery
+
+After applying migrations `202610130010_operator_recovery` and `202610130011_recovery_deadline_recheck`, rerun runtime provisioning. API receives only checked preview/confirmation functions; recovery-request creation and private case records require the migration-owner connection. Worker uses its existing maintenance grant. Keep owner credentials out of production API/mobile environments.
+
+Run `pnpm --filter @portl/server db:recovery prepare .local/recovery.json` only after the operator has verified the target's identity and society authority and recorded a private case reference. The JSON input must be a mode-0600 regular file under 8KB; the example intentionally has false verification attestations. Preparation needs the existing root auth secret and Resend configuration; status/cancel need the owner connection and root configuration. Never give the owner database credentials to a recovering admin. The user enters recovery codes in their own app; operators must not request or relay them.
