@@ -9,6 +9,7 @@ import { VisitorQueue } from '../features/gate/visitor-queue';
 import { Registration } from '../features/gate/registration';
 import { AdminGates } from '../features/gate/admin-gates';
 import { VisitDetail } from '../features/gate/visit-detail';
+jest.mock('../features/gate/socket', () => ({ useGateSocket: () => true }));
 const mockApi = jest.fn();
 let mockOnline = true;
 jest.mock('../features/gate/live', () => ({
@@ -101,6 +102,8 @@ it('requires confirmation before a resident approves and sends the observed vers
       '/societies/s1/gate/requests/r1/decision',
       expect.anything(),
       { intentId: expect.any(String), expectedVersion: 1, decision: 'APPROVE' },
+      undefined,
+      'u1',
     ),
   );
 });
@@ -316,4 +319,33 @@ it('lets an admin choose an existing verified email and gate without choosing a 
       { email: 'guard@example.com', gateId: 'g1' },
     ),
   );
+});
+
+it('hides cached visitor details after an authoritative refresh fails', async () => {
+  show();
+  await screen.findByText('A Guest');
+  mockApi.mockRejectedValue(new Error('Access no longer available'));
+  fireEvent.press(screen.getByRole('button', { name: 'Refresh status' }));
+  await screen.findByText('Access no longer available');
+  expect(screen.queryByText('A Guest')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Approve visitor' })).toBeNull();
+});
+it('hides cached queue cards after access is revoked', async () => {
+  mockApi.mockResolvedValue({ items: [visitor], nextCursor: null });
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({
+          defaultOptions: { queries: { retry: false, gcTime: 0 } },
+        })
+      }
+    >
+      <VisitorQueue userId="u1" societyId="s1" view="RESIDENT" />
+    </QueryClientProvider>,
+  );
+  await screen.findByText('A Guest');
+  mockApi.mockRejectedValue(new Error('Access no longer available'));
+  fireEvent.press(screen.getByRole('button', { name: 'Refresh visitors' }));
+  await screen.findByText('Access no longer available');
+  expect(screen.queryByText('A Guest')).toBeNull();
 });

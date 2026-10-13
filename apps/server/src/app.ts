@@ -1,3 +1,4 @@
+import type { GateSignal } from '@portl/contracts';
 import { notificationRouter } from './notifications/router.js';
 import { noticeRouter } from './notices/router.js';
 import type { TokenCipher } from './notifications/tokens.js';
@@ -25,6 +26,7 @@ type AppServices = {
   baseURL: string;
   passCodes: PassCodes;
   tokenCipher?: TokenCipher;
+  onGateChange?: (signal: GateSignal) => void;
 };
 
 export function createApp(logger?: Logger, services?: AppServices) {
@@ -167,7 +169,12 @@ export function createApp(logger?: Logger, services?: AppServices) {
     });
     app.use(
       '/v1/societies/:societyId/gate',
-      gateRouter(services.auth, services.db, services.passCodes),
+      gateRouter(
+        services.auth,
+        services.db,
+        services.passCodes,
+        services.onGateChange,
+      ),
     );
     app.use(
       '/v1/notifications',

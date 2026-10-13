@@ -20,6 +20,7 @@ import {
 } from '../../components/ui';
 import { VisitorCard } from './visitor-card';
 import { gateKey, gatePath, useLiveGate } from './live';
+import { useGateSocket } from './socket';
 type Action = 'APPROVE' | 'REJECT' | 'cancel' | 'entry' | 'exit';
 type Intent = {
   kind: string;
@@ -42,6 +43,7 @@ export function VisitDetail({
   view: GateView;
 }) {
   const live = useLiveGate();
+  const connected = useGateSocket(userId, societyId, view, live.enabled);
   const client = useQueryClient();
   const [choice, setChoice] = useState<Action | null>(null);
   const [gateId, setGate] = useState('');
@@ -55,6 +57,7 @@ export function VisitDetail({
         visitorDetailSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled,
     refetchInterval: 5000,
@@ -68,6 +71,7 @@ export function VisitDetail({
         gateSetupSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled && view === 'GUARD',
     staleTime: 0,
@@ -78,6 +82,8 @@ export function VisitDetail({
         gatePath(societyId, `requests/${id}/${intent.kind}`),
         gateCommandSchema,
         intent.body,
+        undefined,
+        userId,
       ),
     onSuccess: async () => {
       retryRef.current = null;
@@ -100,7 +106,7 @@ export function VisitDetail({
   });
   if (query.isPending) return <Loading label="Checking visitor status…" />;
   const r = query.data?.request;
-  if (!r)
+  if (query.error || !r)
     return (
       <>
         <ErrorMessage message={messageOf(query.error)} />
@@ -148,10 +154,11 @@ export function VisitDetail({
       <VisitorCard request={r} />
       <Copy small>
         {fresh
-          ? 'Status refreshes every 5 seconds while this screen is open.'
+          ? connected
+            ? 'Live gate updates are connected.'
+            : 'Connecting to live updates. Checking gate status every 5 seconds.'
           : 'Status is not current. Reconnect and refresh before taking action.'}
       </Copy>
-      <ErrorMessage message={query.error ? messageOf(query.error) : null} />
       <ErrorMessage message={action.error ? messageOf(action.error) : null} />
       {!choice && !retry && view === 'RESIDENT' && waiting && (
         <>

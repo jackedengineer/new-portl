@@ -8,6 +8,7 @@ import type {
   GateCancelInput,
   GateCommand,
   GateDecisionInput,
+  GateSignal,
   MovementInput,
 } from '@portl/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
@@ -43,7 +44,19 @@ async function command(
   );
   return { requestId: result.resourceId, version: result.version };
 }
-export function gateCommands(db: PrismaClient) {
+export function gateCommands(
+  db: PrismaClient,
+  publish?: (signal: GateSignal) => void,
+) {
+  function committed(societyId: string, result: GateCommand) {
+    // A failed optional live signal must never misreport a committed command as failed.
+    try {
+      publish?.({ societyId, ...result });
+    } catch {
+      /* REST reconciles missed signals. */
+    }
+    return result;
+  }
   return {
     register: (actor: Actor, sid: string, input: ArrivalInput) =>
       withNotificationTransaction(db, actor, async (tx) => {
@@ -109,7 +122,7 @@ export function gateCommands(db: PrismaClient) {
             return { requestId: id, version: 1 };
           },
         );
-      }),
+      }).then((result) => committed(sid, result)),
     act: (
       actor: Actor,
       sid: string,
@@ -251,6 +264,6 @@ export function gateCommands(db: PrismaClient) {
             return { requestId: id, version: row.version + 1 };
           },
         );
-      }),
+      }).then((result) => committed(sid, result)),
   };
 }

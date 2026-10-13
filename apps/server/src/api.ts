@@ -1,3 +1,6 @@
+import { createServer } from 'node:http';
+import { createGateSocketServer } from './gate/live.js';
+import { gateLiveAccess } from './gate/live-access.js';
 import { tokenCipher } from './notifications/tokens.js';
 import { stopNotificationQueue } from './notifications/jobs.js';
 import { passCodes } from './gate/pass-codes.js';
@@ -26,13 +29,22 @@ const auth = createAuth(
   authEnv,
   resendDelivery(authEnv.RESEND_API_KEY, authEnv.EMAIL_FROM),
 );
-const server = createApp(logger, {
-  auth,
-  db,
-  baseURL: authEnv.BETTER_AUTH_URL,
-  passCodes: passCodes(authEnv.BETTER_AUTH_SECRET),
-  tokenCipher: tokenCipher(authEnv.BETTER_AUTH_SECRET),
-}).listen(env.PORT, env.HOST, () => {
+const server = createServer(
+  createApp(logger, {
+    auth,
+    db,
+    baseURL: authEnv.BETTER_AUTH_URL,
+    passCodes: passCodes(authEnv.BETTER_AUTH_SECRET),
+    tokenCipher: tokenCipher(authEnv.BETTER_AUTH_SECRET),
+    onGateChange: (signal) => live.publish(signal),
+  }),
+);
+const live = createGateSocketServer(server, {
+  authorize: gateLiveAccess(auth, db),
+  acceptsOrigin: auth.acceptsOrigin,
+  budget: (userId) => auth.budget(userId, 'gate-live-connect', 20, 60),
+});
+server.listen(env.PORT, env.HOST, () => {
   logger.info({ port: env.PORT }, 'API listening');
 });
 server.requestTimeout = 30_000;
@@ -53,9 +65,8 @@ function shutdown(signal: string) {
     process.exitCode = 1;
   }, 10_000);
   deadline.unref();
-  server.close(async (error) => {
+  void live.close().then(async () => {
     clearTimeout(deadline);
-    if (error) process.exitCode = 1;
     await stopNotificationQueue(db);
     await db.$disconnect();
   });

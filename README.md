@@ -74,6 +74,12 @@ Assured admins can manage towers/flats, inspect current/ended residencies, end o
 
 Apply migrations and rerun runtime provisioning before starting the updated API. With the matching mobile increment, open **Community → Society overview** for administration or **Community → Community directory** as a resident. No new credentials, dependencies or native plugins are required. Use an isolated development database for tests; new-screen device acceptance remains separate from automated checks.
 
+## Live gate updates
+
+Focused visitor queues and detail screens use Socket.IO to refresh immediately after an arrival, decision, cancellation, entry or exit commits. The server checks the current session, society role and request audience before each minimal change signal. REST remains authoritative; reconnects refresh state and the five-second polling fallback recovers missed signals. Background push continues through the separate worker.
+
+Run one API process/replica for this release. Live signals are process-local; scaling replicas requires a shared adapter and another review. Connections, outstanding authorization checks and queued work are bounded; slow transports drop optional signals. Socket.IO uses the existing API origin/port and supports WebSocket plus HTTP polling. No database migration, new credentials or native rebuild is required for this JavaScript-only addition. Guest-pass screens retain their existing polling behavior. Test resident and guard screens on separate sessions, including loss of Wi-Fi and return from the background, before claiming device acceptance.
+
 ## Checks
 
 ```sh
@@ -90,4 +96,4 @@ Integration tests use real PostgreSQL and synthetic identities with a fake email
 
 GitHub Actions runs these checks on pushes to `main` and pull requests. A separate dependency-audit job reports upstream issues without hiding them; see [the current dependency review](DEPENDENCY_REVIEW.md). Deployment and store submission are not enabled by this workflow. Branch protection and required check settings must be configured before merging later feature pull requests.
 
-Architectural specifications and their frozen version history remain outside this Git checkout. This increment corresponds to specification edition 2.0.0 (CHG-0011); specification editions are independent of app versions. The owner deferred polls, helpdesk and amenities/bookings after v1. Authorized live signals, account deletion/privacy flows, production provisioning/recovery and signed store releases remain v1 work. Android development APK installation and notification receipt are owner-confirmed; that does not establish acceptance of these new screens or release builds. Before public deployment, resolve privacy/retention, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.
+Architectural specifications and their frozen version history remain outside this Git checkout. The live-gate increment corresponds to specification edition 2.1.0 (CHG-0012); specification editions are independent of app versions. The owner deferred polls, helpdesk and amenities/bookings after v1. Account deletion/privacy flows, production provisioning/recovery and signed store releases remain v1 work. Live gate device acceptance is pending. Android development APK installation and notification receipt are owner-confirmed; that does not establish acceptance of these new screens or release builds. Before public deployment, resolve privacy/retention, guest-code re-encryption on root-secret rotation and Railway proxy configuration gates.
