@@ -1,3 +1,4 @@
+import { AdminRecovery } from '../features/account/recovery';
 import { ChangeEmail } from '../features/account/email-change';
 import { useState } from 'react';
 import { router } from 'expo-router';
@@ -122,6 +123,9 @@ export default function Account() {
           ))
         )}
       </Card>
+      {!me.policyRequired && (
+        <AdminRecovery key={`recovery-${me.user.id}`} userId={me.user.id} />
+      )}
       <ChangeEmail
         key={`email-${me.user.id}`}
         userId={me.user.id}
