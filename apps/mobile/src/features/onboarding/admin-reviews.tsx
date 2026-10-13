@@ -23,10 +23,12 @@ import {
 
 function ReviewItem({
   item,
+  userId,
   societyId,
   onDecided,
 }: {
   item: ResidentApplication;
+  userId: string;
   societyId: string;
   onDecided: () => void;
 }) {
@@ -42,6 +44,8 @@ function ReviewItem({
         `/societies/${societyId}/admin/applications/${item.id}/decision`,
         successSchema,
         input,
+        undefined,
+        userId,
       ),
     onSuccess: onDecided,
   });
@@ -135,6 +139,7 @@ export function AdminReviews({
         applicationListSchema,
         undefined,
         signal,
+        userId,
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
@@ -163,6 +168,7 @@ export function AdminReviews({
         <ReviewItem
           key={item.id}
           item={item}
+          userId={userId}
           societyId={societyId}
           onDecided={() => void client.invalidateQueries({ queryKey: key })}
         />

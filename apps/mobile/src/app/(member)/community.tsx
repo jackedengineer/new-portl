@@ -47,13 +47,20 @@ export default function Community() {
         applicationListSchema,
         undefined,
         signal,
+        me?.user.id,
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: !!me,
   });
   const withdraw = useMutation({
     mutationFn: (id: string) =>
-      api(`/onboarding/applications/${id}/withdraw`, successSchema, {}),
+      api(
+        `/onboarding/applications/${id}/withdraw`,
+        successSchema,
+        {},
+        undefined,
+        me?.user.id,
+      ),
     onSuccess: () => client.invalidateQueries({ queryKey: ['applications'] }),
   });
   if (!me) return null;

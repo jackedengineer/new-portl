@@ -5,10 +5,13 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppState } from 'react-native';
 import { VisitorQueue } from '../features/gate/visitor-queue';
 import { Registration } from '../features/gate/registration';
 import { AdminGates } from '../features/gate/admin-gates';
 import { VisitDetail } from '../features/gate/visit-detail';
+import { PassCreate } from '../features/gate/pass-create';
+import { PassVerify } from '../features/gate/pass-verify';
 jest.mock('../features/gate/socket', () => ({ useGateSocket: () => true }));
 const mockApi = jest.fn();
 let mockOnline = true;
@@ -29,6 +32,9 @@ jest.mock('../lib/api', () => ({
 }));
 jest.mock('expo-router', () => ({
   useIsFocused: () => true,
+  useFocusEffect: (fn: () => void) => {
+    jest.requireActual('react').useEffect(fn, [fn]);
+  },
   router: { canGoBack: () => false, push: jest.fn(), replace: jest.fn() },
 }));
 jest.mock('expo-network', () => ({
@@ -277,6 +283,7 @@ it('validates guard registration and preserves an uncertain submission for retry
   );
   const calls = mockApi.mock.calls.filter((c) => c[2]);
   expect(calls[0][2]).toEqual(calls[1][2]);
+  for (const call of mockApi.mock.calls) expect(call[4]).toBe('u1');
 });
 it('lets an admin choose an existing verified email and gate without choosing a public role', async () => {
   mockApi.mockImplementation((_path: string, _schema: unknown, body: unknown) =>
@@ -317,8 +324,175 @@ it('lets an admin choose an existing verified email and gate without choosing a 
       '/societies/s1/gate/admin/assignments',
       expect.anything(),
       { email: 'guard@example.com', gateId: 'g1' },
+      undefined,
+      'admin',
     ),
   );
+  for (const call of mockApi.mock.calls) expect(call[4]).toBe('admin');
+});
+
+it('binds gate creation and assignment removal to the displayed admin', async () => {
+  mockApi.mockImplementation((_path: string, _schema: unknown, body: unknown) =>
+    Promise.resolve(
+      body
+        ? { id: 'g1', name: 'Main gate' }
+        : {
+            gates: [visitor.gate],
+            flats: [],
+            assignments: [
+              {
+                id: 'assignment1',
+                gate: visitor.gate,
+                name: 'Gate guard',
+                email: 'guard@example.com',
+                active: true,
+              },
+            ],
+            serverNow: new Date().toISOString(),
+          },
+    ),
+  );
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({
+          defaultOptions: {
+            queries: { retry: false, gcTime: 0 },
+            mutations: { retry: false, gcTime: 0 },
+          },
+        })
+      }
+    >
+      <AdminGates userId="admin" societyId="s1" />
+    </QueryClientProvider>,
+  );
+  await screen.findByText('Gate guard');
+  fireEvent.changeText(screen.getByLabelText('New gate name'), 'Side gate');
+  fireEvent.press(screen.getByRole('button', { name: 'Add gate' }));
+  await waitFor(() =>
+    expect(mockApi).toHaveBeenCalledWith(
+      '/societies/s1/gate/admin/gates',
+      expect.anything(),
+      { name: 'Side gate' },
+      undefined,
+      'admin',
+    ),
+  );
+  fireEvent.press(
+    screen.getByRole('button', {
+      name: 'Remove guard@example.com from Main gate',
+    }),
+  );
+  fireEvent.press(screen.getByRole('button', { name: 'Confirm removal' }));
+  await waitFor(() =>
+    expect(mockApi).toHaveBeenCalledWith(
+      '/societies/s1/gate/admin/assignments/assignment1/revoke',
+      expect.anything(),
+      {},
+      undefined,
+      'admin',
+    ),
+  );
+});
+
+it('binds guest pass setup and creation to the resident who opened the form', async () => {
+  mockApi.mockImplementation((path: string) =>
+    Promise.resolve(
+      path.endsWith('/setup')
+        ? { flats: [visitor.flat], serverNow: new Date().toISOString() }
+        : { passId: 'p1', version: 1 },
+    ),
+  );
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({
+          defaultOptions: {
+            queries: { retry: false, gcTime: 0 },
+            mutations: { retry: false, gcTime: 0 },
+          },
+        })
+      }
+    >
+      <PassCreate userId="resident-a" societyId="s1" />
+    </QueryClientProvider>,
+  );
+  await screen.findByRole('radio', { name: 'A · 101' });
+  fireEvent.changeText(screen.getByLabelText('Guest name'), 'Invited guest');
+  fireEvent.press(screen.getByRole('button', { name: 'Create guest pass' }));
+  await waitFor(() =>
+    expect(mockApi.mock.calls.some((call) => call[0].endsWith('/passes'))).toBe(
+      true,
+    ),
+  );
+  for (const call of mockApi.mock.calls) expect(call[4]).toBe('resident-a');
+});
+
+it('binds guest verification and entry to the guard who inspected the code', async () => {
+  const listener = jest
+    .spyOn(AppState, 'addEventListener')
+    .mockReturnValue({ remove: jest.fn() });
+  AppState.currentState = 'active';
+  mockApi.mockImplementation((path: string) =>
+    Promise.resolve(
+      path.includes('/setup')
+        ? { gates: [visitor.gate], serverNow: new Date().toISOString() }
+        : path.endsWith('/verify')
+          ? {
+              pass: {
+                id: 'p1',
+                version: 1,
+                visitorName: 'Invited guest',
+                flat: visitor.flat,
+                status: 'READY',
+                presence: 'NOT_ENTERED',
+                events: [],
+                validFrom: new Date(Date.now() - 60000).toISOString(),
+                validUntil: new Date(Date.now() + 3600000).toISOString(),
+              },
+              serverNow: new Date().toISOString(),
+            }
+          : { passId: 'p1', version: 2 },
+    ),
+  );
+  try {
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: {
+              queries: { retry: false, gcTime: 0 },
+              mutations: { retry: false, gcTime: 0 },
+            },
+          })
+        }
+      >
+        <PassVerify userId="guard-a" societyId="s1" />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole('radio', { name: 'Main gate' });
+    fireEvent.changeText(
+      screen.getByLabelText('Guest pass code'),
+      'ABCDEFGHJKMNPQRS',
+    );
+    fireEvent.press(screen.getByRole('button', { name: 'Verify code' }));
+    await screen.findByText('Invited guest');
+    fireEvent.press(screen.getByRole('button', { name: 'Record guest entry' }));
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Confirm guest entry' }),
+    );
+    await waitFor(() =>
+      expect(
+        mockApi.mock.calls.some((call) => call[0].endsWith('/entry')),
+      ).toBe(true),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Guest pass code').props.value).toBe(''),
+    );
+    for (const call of mockApi.mock.calls) expect(call[4]).toBe('guard-a');
+  } finally {
+    listener.mockRestore();
+  }
 });
 
 it('hides cached visitor details after an authoritative refresh fails', async () => {

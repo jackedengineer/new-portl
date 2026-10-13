@@ -23,6 +23,13 @@ export function registryRouter(auth: PortlAuth, db: PrismaClient) {
     });
     if (!session?.user.emailVerified)
       throw new DomainError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    const expectedUserId = req.get('x-portl-expected-user');
+    if (expectedUserId && expectedUserId !== session.user.id)
+      throw new DomainError(
+        401,
+        'SESSION_CHANGED',
+        'Your session changed. Please try again.',
+      );
     const actor: Actor = {
       userId: session.user.id,
       email: session.user.email,

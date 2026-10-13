@@ -45,13 +45,20 @@ export function PassCreate({
         guestPassSetupSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled,
     staleTime: 0,
   });
   const mutation = useMutation({
     mutationFn: (body: GuestPassCreate) =>
-      api(gatePath(societyId, 'passes'), guestPassCommandSchema, body),
+      api(
+        gatePath(societyId, 'passes'),
+        guestPassCommandSchema,
+        body,
+        undefined,
+        userId,
+      ),
     onSuccess: async (result) => {
       saved.current = null;
       setRetry(false);

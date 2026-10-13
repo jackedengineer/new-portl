@@ -24,7 +24,13 @@ export default function Invitation() {
   const preview = useMutation({
     gcTime: 0,
     mutationFn: (value: string) =>
-      api('/onboarding/invitation-preview', previewSchema, { token: value }),
+      api(
+        '/onboarding/invitation-preview',
+        previewSchema,
+        { token: value },
+        undefined,
+        me?.user.id,
+      ),
   });
   const accept = useMutation({
     gcTime: 0,
@@ -33,6 +39,8 @@ export default function Invitation() {
         '/onboarding/invitation-accept',
         z.object({ societyId: z.string() }),
         { token },
+        undefined,
+        me?.user.id,
       ),
     onSuccess: async () => {
       setToken('');

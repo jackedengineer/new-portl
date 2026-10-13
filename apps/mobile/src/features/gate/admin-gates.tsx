@@ -43,6 +43,7 @@ export function AdminGates({
         gateSetupSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled,
     staleTime: 0,
@@ -51,7 +52,13 @@ export function AdminGates({
     client.invalidateQueries({ queryKey: gateKey(userId, societyId) });
   const create = useMutation({
     mutationFn: (input: z.infer<typeof gateInput>) =>
-      api(gatePath(societyId, 'admin/gates'), gateSchema, input),
+      api(
+        gatePath(societyId, 'admin/gates'),
+        gateSchema,
+        input,
+        undefined,
+        userId,
+      ),
     onSuccess: async () => {
       setName('');
       await refresh();
@@ -59,7 +66,13 @@ export function AdminGates({
   });
   const assign = useMutation({
     mutationFn: (input: z.infer<typeof guardAssignmentInput>) =>
-      api(gatePath(societyId, 'admin/assignments'), saved, input),
+      api(
+        gatePath(societyId, 'admin/assignments'),
+        saved,
+        input,
+        undefined,
+        userId,
+      ),
     onSuccess: async () => {
       setEmail('');
       await refresh();
@@ -68,7 +81,13 @@ export function AdminGates({
   });
   const remove = useMutation({
     mutationFn: (id: string) =>
-      api(gatePath(societyId, `admin/assignments/${id}/revoke`), saved, {}),
+      api(
+        gatePath(societyId, `admin/assignments/${id}/revoke`),
+        saved,
+        {},
+        undefined,
+        userId,
+      ),
     onSuccess: async () => {
       setRevoke(null);
       await refresh();
