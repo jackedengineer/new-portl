@@ -29,7 +29,7 @@ export async function accountWorker(
       );
       if (Date.now() - lastCleanup >= 3600000) {
         await cleanupLedger(ledgerPath);
-        await db.$queryRaw`SELECT portl_auth.cleanup_account_metadata()`;
+        await db.$executeRaw`SELECT portl_auth.cleanup_account_metadata()`;
         lastCleanup = Date.now();
       }
       const [row] = await db.$queryRaw<
