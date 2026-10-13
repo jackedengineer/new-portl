@@ -1,6 +1,7 @@
 import express from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import {
+  type GateSignal,
   guestPassCreateInput,
   guestPassEntryInput,
   guestPassExitInput,
@@ -32,9 +33,10 @@ export function gateRouter(
   auth: PortlAuth,
   db: PrismaClient,
   codes: PassCodes,
+  onGateChange?: (signal: GateSignal) => void,
 ) {
   const router = express.Router({ mergeParams: true });
-  const commands = gateCommands(db),
+  const commands = gateCommands(db, onGateChange),
     queries = gateQueries(db),
     admin = gateAdmin(db);
   const passes = passCommands(db, codes),

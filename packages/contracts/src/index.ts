@@ -114,3 +114,4 @@ export * from './guest-passes.ts';
 export * from './notifications.ts';
 export * from './notices.ts';
 export * from './administration.ts';
+export * from './gate-live.ts';

@@ -1,3 +1,14 @@
+import { createServer } from 'node:http';
+import { once as nodeOnce } from 'node:events';
+import type { AddressInfo } from 'node:net';
+import { io, type Socket } from 'socket.io-client';
+import {
+  gateSignalSchema,
+  type GateSignal,
+  type GateSubscription,
+} from '@portl/contracts';
+import { createGateSocketServer } from './live.js';
+import { gateLiveAccess } from './live-access.js';
 import { stopNotificationQueue } from '../notifications/jobs.js';
 import { passCodes } from '../gate/pass-codes.js';
 import { randomUUID } from 'node:crypto';
@@ -30,11 +41,13 @@ const auth = createAuth(
     sent.set(email, otp);
   },
 );
+let onGateChange: ((signal: GateSignal) => void) | undefined;
 const app = createApp(undefined, {
   auth,
   db,
   baseURL: 'http://localhost:3000',
   passCodes: passCodes('test-only-guest-pass-secret-at-least-32-bytes'),
+  onGateChange: (signal) => onGateChange?.(signal),
 });
 type User = { id: string; email: string; cookie: string; sessionId: string };
 const users: User[] = [];
@@ -278,6 +291,166 @@ it('requires assured admin to create gates and grant verified guard access', asy
     { id: gateId, name: 'Main gate' },
   ]);
 });
+function socketNext(socket: Socket, event: string) {
+  return new Promise<unknown>((resolve, reject) => {
+    const receive = (value: unknown) => {
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => {
+      socket.off(event, receive);
+      reject(new Error(`Missing ${event}`));
+    }, 15000);
+    socket.once(event, receive);
+  });
+}
+it('delivers committed arrivals and decisions through real sockets with current session, tenant and role checks', async () => {
+  const http = createServer(app),
+    authorize = gateLiveAccess(auth, db);
+  const live = createGateSocketServer(http, {
+    authorize,
+    acceptsOrigin: auth.acceptsOrigin,
+    budget: (uid) => auth.budget(uid, 'gate-live-test', 20, 60),
+  });
+  let published = 0;
+  onGateChange = (signal) => {
+    published++;
+    live.publish(signal);
+  };
+  http.listen(0, '127.0.0.1');
+  await nodeOnce(http, 'listening');
+  const sockets: Socket[] = [];
+  const connect = (
+    user: User,
+    view: GateSubscription['view'],
+    societyId = sid,
+    userId = user.id,
+  ) => {
+    const socket = io(
+      `http://127.0.0.1:${(http.address() as AddressInfo).port}`,
+      {
+        autoConnect: false,
+        transports: ['websocket'],
+        reconnection: false,
+        extraHeaders: { cookie: user.cookie, 'expo-origin': 'portl://' },
+        auth: { userId, societyId, view },
+      },
+    );
+    sockets.push(socket);
+    return socket;
+  };
+  const open = async (socket: Socket) => {
+    const ready = socketNext(socket, 'connect');
+    socket.connect();
+    await ready;
+    return socket;
+  };
+  try {
+    const residentSocket = await open(connect(resident, 'RESIDENT'));
+    const guardSocket = await open(connect(guard, 'GUARD'));
+    for (const denied of [
+      connect(outsider, 'RESIDENT'),
+      connect(resident, 'RESIDENT', otherSid),
+      connect(resident, 'RESIDENT', sid, guard.id),
+      connect(guard, 'ADMIN'),
+    ]) {
+      const failed = socketNext(denied, 'connect_error');
+      denied.connect();
+      await failed;
+      expect(denied.connected).toBe(false);
+    }
+    const incoming = socketNext(residentSocket, 'gate:changed'),
+      gateIncoming = socketNext(guardSocket, 'gate:changed');
+    const { result } = await register();
+    const signal = gateSignalSchema.parse(await incoming);
+    expect(signal).toEqual({
+      societyId: sid,
+      requestId: result.requestId,
+      version: 1,
+    });
+    expect(await gateIncoming).toEqual(signal);
+    expect((await detail(result.requestId, resident)).body.request.status).toBe(
+      'PENDING',
+    );
+    const decision = socketNext(guardSocket, 'gate:changed'),
+      householdDecision = socketNext(residentSocket, 'gate:changed');
+    expect((await approve(result.requestId)).status).toBe(200);
+    expect(await decision).toEqual({ ...signal, version: 2 });
+    await householdDecision;
+    expect((await detail(result.requestId)).body.request.status).toBe(
+      'APPROVED',
+    );
+    expect((await approve(result.requestId)).status).toBe(409);
+    expect(published).toBe(2);
+    // A later occupancy episode must not inherit a captured request audience.
+    const occupancy = await owner.occupancy.findFirstOrThrow({
+      where: { societyId: sid, userId: resident.id },
+    });
+    await owner.occupancy.update({
+      where: { id: occupancy.id },
+      data: { startedAt: new Date(occupancy.startedAt.getTime() + 1) },
+    });
+    try {
+      expect(
+        await authorize(
+          { cookie: resident.cookie },
+          { userId: resident.id, societyId: sid, view: 'RESIDENT' },
+          result.requestId,
+        ),
+      ).toBe(false);
+    } finally {
+      await owner.occupancy.update({
+        where: { id: occupancy.id },
+        data: { startedAt: occupancy.startedAt },
+      });
+    }
+    const assurance = await owner.adminAssurance.findUniqueOrThrow({
+      where: { sessionId: admin.sessionId },
+    });
+    await owner.adminAssurance.update({
+      where: { sessionId: admin.sessionId },
+      data: { expiresAt: new Date(0) },
+    });
+    try {
+      await expect(
+        authorize(
+          { cookie: admin.cookie },
+          { userId: admin.id, societyId: sid, view: 'ADMIN' },
+        ),
+      ).rejects.toMatchObject({ code: 'ADMIN_STEP_UP_REQUIRED' });
+    } finally {
+      await owner.adminAssurance.update({
+        where: { sessionId: admin.sessionId },
+        data: { expiresAt: assurance.expiresAt },
+      });
+    }
+    const session = await owner.session.findUniqueOrThrow({
+      where: { id: guard.sessionId },
+    });
+    await owner.session.update({
+      where: { id: guard.sessionId },
+      data: { expiresAt: new Date(0) },
+    });
+    try {
+      const disconnected = socketNext(guardSocket, 'disconnect');
+      live.publish({ ...signal, version: 2 });
+      await disconnected;
+      expect(guardSocket.connected).toBe(false);
+    } finally {
+      // Better Auth deletes expired sessions during verification. Restore only this
+      // synthetic fixture so subsequent gate tests retain their original login.
+      await owner.session.upsert({
+        where: { id: guard.sessionId },
+        create: session,
+        update: { expiresAt: session.expiresAt },
+      });
+    }
+  } finally {
+    onGateChange = undefined;
+    sockets.forEach((socket) => socket.disconnect());
+    await live.close();
+  }
+}, 60000);
 it('registers once on retries and delivers a private request to both current residents', async () => {
   const { input, result } = await register();
   const replay = await call(guard, 'post', 'requests', input);

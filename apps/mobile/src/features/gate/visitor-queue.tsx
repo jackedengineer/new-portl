@@ -16,6 +16,7 @@ import {
   Row,
 } from '../../components/ui';
 import { gateKey, gatePath, useLiveGate } from './live';
+import { useGateSocket } from './socket';
 import { VisitorCard } from './visitor-card';
 const filters: Record<GateFilter, string> = {
   WAITING: 'Waiting',
@@ -33,6 +34,7 @@ export function VisitorQueue({
   view: GateView;
 }) {
   const live = useLiveGate();
+  const connected = useGateSocket(userId, societyId, view, live.enabled);
   const [filter, setFilter] = useState<GateFilter>('WAITING');
   const [pages, setPages] = useState<(string | undefined)[]>([undefined]);
   const cursor = pages.at(-1);
@@ -47,6 +49,7 @@ export function VisitorQueue({
         visitorListSchema,
         undefined,
         signal,
+        userId,
       ),
     enabled: live.enabled,
     refetchInterval: 5000,
@@ -105,7 +108,9 @@ export function VisitorQueue({
           ? 'You’re offline. Reconnect to get current gate status.'
           : query.error
             ? 'Updates paused. Refresh before relying on this status.'
-            : 'Keep this screen open for new requests. Updates every 5 seconds; background alerts are coming soon.'}
+            : connected
+              ? 'Live gate updates are connected.'
+              : 'Connecting to live updates. Checking gate status every 5 seconds.'}
       </Copy>
       {query.isPending && <Loading label="Checking the gate…" />}
       <ErrorMessage message={query.error ? messageOf(query.error) : null} />
@@ -127,20 +132,21 @@ export function VisitorQueue({
           </Copy>
         </>
       )}
-      {query.data?.items.map((r) => (
-        <VisitorCard key={r.id} request={r}>
-          <Button
-            label={`View ${r.visitorName}`}
-            variant="secondary"
-            onPress={() =>
-              router.push({
-                pathname: '/visitor',
-                params: { societyId, id: r.id, view },
-              })
-            }
-          />
-        </VisitorCard>
-      ))}
+      {!query.error &&
+        query.data?.items.map((r) => (
+          <VisitorCard key={r.id} request={r}>
+            <Button
+              label={`View ${r.visitorName}`}
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: '/visitor',
+                  params: { societyId, id: r.id, view },
+                })
+              }
+            />
+          </VisitorCard>
+        ))}
       <Row>
         {pages.length > 1 && (
           <Button
@@ -149,7 +155,7 @@ export function VisitorQueue({
             onPress={() => setPages((p) => p.slice(0, -1))}
           />
         )}
-        {!!query.data?.nextCursor && (
+        {!query.error && !!query.data?.nextCursor && (
           <Button
             label="Next page"
             variant="secondary"
