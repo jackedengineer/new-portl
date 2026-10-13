@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -53,7 +54,7 @@ beforeEach(() => {
   mockApi.mockReset();
   mockApi.mockResolvedValueOnce(challenge);
   mockSave.mockResolvedValue(undefined);
-  mockForget.mockResolvedValue(undefined);
+  mockForget.mockResolvedValue(true);
   mockSend.mockResolvedValue({ data: { success: true } });
   mockRequest.mockResolvedValue({ data: { success: true } });
   mockChange.mockResolvedValue({ data: { success: true } });
@@ -146,4 +147,81 @@ it('verifies both email addresses with identity binding and clears the session o
     screen.getByRole('button', { name: 'Confirm email change & sign out' }),
   );
   await waitFor(() => expect(mockForget).toHaveBeenCalledTimes(1));
+});
+
+it('does not sign out or navigate a new account after a delayed deletion confirmation', async () => {
+  const view = render(
+    <DeleteAccount userId="user-a" email="a@example.invalid" />,
+  );
+  fireEvent.press(screen.getByRole('button', { name: 'Send deletion code' }));
+  await screen.findByLabelText('Deletion email code');
+  fireEvent.changeText(screen.getByLabelText('Deletion email code'), '123456');
+  fireEvent.changeText(
+    screen.getByLabelText('Type DELETE to confirm'),
+    'DELETE',
+  );
+  let finish!: (value: { status: string }) => void;
+  mockApi.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  fireEvent.press(
+    screen.getByRole('button', { name: 'Permanently delete my account' }),
+  );
+  await waitFor(() => expect(mockApi).toHaveBeenCalledTimes(2));
+  view.unmount();
+  render(<DeleteAccount userId="user-b" email="b@example.invalid" />);
+  await act(async () => finish({ status: 'PENDING' }));
+  expect(mockForget).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+it('does not sign out a new account after a delayed email-change confirmation', async () => {
+  const view = render(
+    <ChangeEmail userId="user-a" email="a@example.invalid" />,
+  );
+  fireEvent.press(screen.getByRole('button', { name: 'Verify current email' }));
+  await screen.findByLabelText('Current email code');
+  fireEvent.changeText(
+    screen.getByLabelText('New email address'),
+    'new@example.invalid',
+  );
+  fireEvent.changeText(screen.getByLabelText('Current email code'), '123456');
+  fireEvent.press(
+    screen.getByRole('button', { name: 'Verify & send new email code' }),
+  );
+  await screen.findByLabelText('New email code');
+  let finish!: (value: { data: { success: boolean } }) => void;
+  mockChange.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  fireEvent.changeText(screen.getByLabelText('New email code'), '654321');
+  fireEvent.press(
+    screen.getByRole('button', { name: 'Confirm email change & sign out' }),
+  );
+  await waitFor(() => expect(mockChange).toHaveBeenCalledTimes(1));
+  view.unmount();
+  render(<ChangeEmail userId="user-b" email="b@example.invalid" />);
+  await act(async () => finish({ data: { success: true } }));
+  expect(mockForget).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+it('does not navigate after deletion cleanup loses its identity authority', async () => {
+  await deletion();
+  mockApi.mockResolvedValueOnce({ status: 'PENDING' });
+  mockForget.mockResolvedValueOnce(false);
+  fireEvent.changeText(screen.getByLabelText('Deletion email code'), '123456');
+  fireEvent.changeText(
+    screen.getByLabelText('Type DELETE to confirm'),
+    'DELETE',
+  );
+  fireEvent.press(
+    screen.getByRole('button', { name: 'Permanently delete my account' }),
+  );
+  await waitFor(() => expect(mockForget).toHaveBeenCalledTimes(1));
+  expect(mockReplace).not.toHaveBeenCalled();
 });

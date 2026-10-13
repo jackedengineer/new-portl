@@ -1,6 +1,7 @@
 import { Text, Pressable } from 'react-native';
 import { useEffect } from 'react';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -12,6 +13,8 @@ import { SessionProvider, useSession } from '../auth/session';
 const mockGetSession = jest.fn();
 const mockSignOut = jest.fn();
 const mockApi = jest.fn();
+const mockClearPush = jest.fn();
+let sessionForTest: ReturnType<typeof useSession>;
 let clientForCleanup: ReturnType<typeof useQueryClient>;
 jest.mock('../lib/auth-client', () => ({
   authClient: {
@@ -23,12 +26,18 @@ jest.mock('../lib/api', () => ({
   api: (...args: unknown[]) => mockApi(...args),
   ApiError: class extends Error {},
 }));
+jest.mock('../features/notifications/native', () => ({
+  clearPushState: () => mockClearPush(),
+}));
+beforeEach(() => mockClearPush.mockResolvedValue(undefined));
+afterEach(() => clientForCleanup?.clear());
 function Harness() {
   const session = useSession();
   const client = useQueryClient();
   useEffect(() => {
     clientForCleanup = client;
-  }, [client]);
+    sessionForTest = session;
+  }, [client, session]);
   return (
     <>
       <Text>
@@ -100,3 +109,210 @@ it('notifies the active session observer on logout and freshly resolves the next
   rendered.unmount();
   clientForCleanup!.clear();
 });
+
+it('ignores a previous identity’s delayed teardown after a new sign-in', async () => {
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'first' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'first', email: 'first@example.invalid' },
+    memberships: [],
+  });
+  const rendered = render(
+    <SessionProvider>
+      <Harness />
+    </SessionProvider>,
+  );
+  await screen.findByText('first@example.invalid');
+  const forgetFirst = sessionForTest.forgetSession;
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'second' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'second', email: 'second@example.invalid' },
+    memberships: [],
+  });
+  await act(async () => sessionForTest.signedIn());
+  await screen.findByText('second@example.invalid');
+  const signOuts = mockSignOut.mock.calls.length;
+  await act(async () => forgetFirst());
+  expect(screen.getByText('second@example.invalid')).toBeTruthy();
+  expect(mockSignOut).toHaveBeenCalledTimes(signOuts);
+  rendered.unmount();
+});
+it('preserves a resolved identity through a failed refresh and clears it on authoritative sign-out', async () => {
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'first' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'first', email: 'first@example.invalid' },
+    memberships: [],
+  });
+  const rendered = render(
+    <SessionProvider>
+      <Harness />
+    </SessionProvider>,
+  );
+  await screen.findByText('first@example.invalid');
+  mockGetSession.mockRejectedValueOnce(new Error('Connection lost'));
+  await act(async () => sessionForTest.refresh());
+  await waitFor(() => expect(sessionForTest.error).toBeTruthy());
+  expect(screen.getByText('first@example.invalid')).toBeTruthy();
+  mockGetSession.mockResolvedValueOnce({ data: null });
+  await act(async () => sessionForTest.refresh());
+  await screen.findByText('Signed out');
+  expect(sessionForTest.error).toBeNull();
+  rendered.unmount();
+});
+it('does not revoke a new sign-in that starts while local cleanup is settling', async () => {
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'first' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'first', email: 'first@example.invalid' },
+    memberships: [],
+  });
+  const rendered = render(
+    <SessionProvider>
+      <Harness />
+    </SessionProvider>,
+  );
+  await screen.findByText('first@example.invalid');
+  let finish!: () => void;
+  mockClearPush.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  let forgotten!: Promise<unknown>;
+  await act(async () => {
+    forgotten = sessionForTest.forgetSession();
+  });
+  await waitFor(() => expect(finish).toBeDefined());
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'second' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'second', email: 'second@example.invalid' },
+    memberships: [],
+  });
+  await act(async () => sessionForTest.signedIn());
+  await waitFor(() => expect(sessionForTest.me?.user.id).toBe('second'));
+  expect(sessionForTest.loading).toBe(true);
+  const signOuts = mockSignOut.mock.calls.length;
+  await act(async () => {
+    finish();
+    await forgotten;
+  });
+  expect(screen.getByText('second@example.invalid')).toBeTruthy();
+  expect(mockSignOut).toHaveBeenCalledTimes(signOuts);
+  rendered.unmount();
+});
+it('treats an authoritative session rejection as signed out rather than a recoverable refresh error', async () => {
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'first' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'first', email: 'first@example.invalid' },
+    memberships: [],
+  });
+  const rendered = render(
+    <SessionProvider>
+      <Harness />
+    </SessionProvider>,
+  );
+  await screen.findByText('first@example.invalid');
+  mockGetSession.mockResolvedValueOnce({ error: { status: 401 } });
+  await act(async () => sessionForTest.refresh());
+  await screen.findByText('Signed out');
+  expect(sessionForTest.error).toBeNull();
+  rendered.unmount();
+});
+
+it.each(['success', 'failure'] as const)(
+  'blocks authentication until the native sign-out %s has settled after forgetting a session',
+  async (outcome) => {
+    mockGetSession.mockResolvedValue({ data: { user: { id: 'first' } } });
+    mockApi.mockResolvedValue({
+      user: { id: 'first', email: 'first@example.invalid' },
+      memberships: [],
+    });
+    render(
+      <SessionProvider>
+        <Harness />
+      </SessionProvider>,
+    );
+    await screen.findByText('first@example.invalid');
+    let finish!: () => void;
+    let fail!: (error: Error) => void;
+    mockSignOut.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          finish = resolve;
+          fail = reject;
+        }),
+    );
+    let forgotten!: Promise<unknown>;
+    await act(async () => {
+      forgotten = sessionForTest.forgetSession('first');
+    });
+    await waitFor(() => expect(finish).toBeDefined());
+    expect(sessionForTest.me).toBeNull();
+    expect(sessionForTest.loading).toBe(true);
+    expect(screen.queryByText('Signed out')).toBeNull();
+    await act(async () => {
+      if (outcome === 'success') finish();
+      else fail(new Error('Connection lost'));
+      await forgotten;
+    });
+    await screen.findByText('Signed out');
+    expect(sessionForTest.loading).toBe(false);
+  },
+);
+it.each(['earlier', 'newer'] as const)(
+  'keeps authentication blocked when the %s sign-out finishes first',
+  async (order) => {
+    mockGetSession.mockResolvedValue({ data: { user: { id: 'first' } } });
+    mockApi.mockResolvedValue({
+      user: { id: 'first', email: 'first@example.invalid' },
+      memberships: [],
+    });
+    render(
+      <SessionProvider>
+        <Harness />
+      </SessionProvider>,
+    );
+    await screen.findByText('first@example.invalid');
+    let finishFirst!: (value: { data: { success: boolean } }) => void;
+    let finishSecond!: (value: { data: { success: boolean } }) => void;
+    mockSignOut.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirst = resolve;
+        }),
+    );
+    mockSignOut.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSecond = resolve;
+        }),
+    );
+    let first!: Promise<void>, second!: Promise<void>;
+    await act(async () => {
+      first = sessionForTest.signOut();
+    });
+    await act(async () => {
+      second = sessionForTest.signOut();
+    });
+    await act(async () => {
+      if (order === 'earlier') {
+        finishFirst({ data: { success: true } });
+        await first;
+      } else {
+        finishSecond({ data: { success: true } });
+        await second;
+      }
+    });
+    expect(sessionForTest.loading).toBe(true);
+    await act(async () => {
+      if (order === 'earlier') {
+        finishSecond({ data: { success: true } });
+        await second;
+      } else {
+        finishFirst({ data: { success: true } });
+        await first;
+      }
+    });
+    await screen.findByText('Signed out');
+    expect(sessionForTest.loading).toBe(false);
+  },
+);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { emailSchema } from '@portl/contracts';
 import { authClient } from '../../lib/auth-client';
 import { messageOf } from '../../lib/api';
@@ -19,6 +19,13 @@ export function ChangeEmail({
   email: string;
 }) {
   const { forgetSession } = useSession();
+  const mounted = useRef(true);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [stage, setStage] = useState<'start' | 'current' | 'new' | 'done'>(
     'start',
   );
@@ -68,8 +75,9 @@ export function ChangeEmail({
           throw new Error(
             'Could not change your email. Check the code or restart. If the connection was interrupted, try signing in with the new address.',
           );
+        if (!mounted.current) return;
         setStage('done');
-        await forgetSession();
+        await forgetSession(userId);
       }
     } catch (e) {
       setError(messageOf(e));

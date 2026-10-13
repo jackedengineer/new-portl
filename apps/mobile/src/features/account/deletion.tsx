@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import {
   deletionChallengeSchema,
@@ -24,6 +24,13 @@ export function DeleteAccount({
   email: string;
 }) {
   const { forgetSession } = useSession();
+  const mounted = useRef(true);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [challenge, setChallenge] = useState<z.infer<
     typeof deletionChallengeSchema
   > | null>(null);
@@ -56,6 +63,7 @@ export function DeleteAccount({
     try {
       // Preserve the recovery capability before an irreversible request, even if its response is lost.
       await saveReceipt(challenge.receiptToken);
+      if (!mounted.current) return;
       await api('/account/deletion/confirm', deletionStatusSchema, {
         challengeId: challenge.challengeId,
         receiptToken: challenge.receiptToken,
@@ -63,8 +71,8 @@ export function DeleteAccount({
         confirmation,
         expectedUserId: userId,
       });
-      await forgetSession();
-      router.replace('/deletion-status');
+      if (!mounted.current) return;
+      if (await forgetSession(userId)) router.replace('/deletion-status');
     } catch (e) {
       setError(
         `${messageOf(e)} If you may have confirmed already, check deletion status using your receipt.`,

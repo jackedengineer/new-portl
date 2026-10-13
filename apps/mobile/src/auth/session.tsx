@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -38,6 +39,7 @@ const queryClient = new QueryClient({
 async function readIdentity(signal?: AbortSignal) {
   // The supported auth client processes renewal/revocation cookies in SecureStore.
   const session = await authClient.getSession({ fetchOptions: { signal } });
+  if (session.error?.status === 401) return null;
   if (session.error)
     throw new ApiError(
       session.error.status,
@@ -56,17 +58,20 @@ type Challenge = { email: string; sentAt: number };
 type SessionContext = {
   me: Me | null;
   loading: boolean;
+  resolved: boolean;
   error: unknown;
   challenge: Challenge | null;
   setChallenge: (value: Challenge | null) => void;
   refresh: () => Promise<void>;
   signedIn: () => Promise<void>;
   signOut: () => Promise<void>;
-  forgetSession: () => Promise<void>;
+  forgetSession: (expectedUserId?: string) => Promise<boolean>;
 };
 const Context = createContext<SessionContext | null>(null);
 function Session({ children }: { children: ReactNode }) {
   const client = useQueryClient();
+  const revision = useRef(0);
+  const [pendingCleanups, setPendingCleanups] = useState(0);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const identity = useQuery({
     queryKey: ['identity'],
@@ -91,6 +96,7 @@ function Session({ children }: { children: ReactNode }) {
     await client.invalidateQueries();
   }
   async function signedIn() {
+    revision.current++;
     setChallenge(null);
     await client.cancelQueries();
     client.removeQueries({
@@ -108,36 +114,65 @@ function Session({ children }: { children: ReactNode }) {
     });
   }
   async function signOut() {
-    const result = await authClient.signOut();
-    if (result.error)
-      throw new Error(
-        'Could not sign out. Check your connection and try again.',
+    const started = ++revision.current;
+    const userId = identity.data?.user.id;
+    setPendingCleanups((count) => count + 1);
+    try {
+      const result = await authClient.signOut();
+      if (result.error)
+        throw new Error(
+          'Could not sign out. Check your connection and try again.',
+        );
+      await clearLocalSession(
+        () => revision.current === started && currentUserId() === userId,
       );
-    await clearLocalSession();
+    } finally {
+      setPendingCleanups((count) => count - 1);
+    }
   }
-  async function forgetSession() {
+  function currentUserId() {
+    return client.getQueryData<Me | null>(['identity'])?.user.id;
+  }
+  async function forgetSession(expectedUserId = identity.data?.user.id) {
     // The server has already revoked this session (deletion/email change/revoke).
     // Expo's supported sign-out action clears its cookie cache before networking.
-    await clearLocalSession();
-    await authClient
-      .signOut({ fetchOptions: { timeout: 3000 } })
-      .catch(() => {});
+    if (!expectedUserId || currentUserId() !== expectedUserId) return false;
+    const started = ++revision.current;
+    setPendingCleanups((count) => count + 1);
+    try {
+      const cleared = await clearLocalSession(
+        () =>
+          revision.current === started && currentUserId() === expectedUserId,
+      );
+      // A programmatic identity change may occur while native cleanup settles.
+      if (!cleared || revision.current !== started || currentUserId())
+        return false;
+      await authClient
+        .signOut({ fetchOptions: { timeout: 3000 } })
+        .catch(() => {});
+      return revision.current === started && !currentUserId();
+    } finally {
+      setPendingCleanups((count) => count - 1);
+    }
   }
-  async function clearLocalSession() {
-    setChallenge(null);
+  async function clearLocalSession(current: () => boolean) {
     await client.cancelQueries();
+    if (!current()) return false;
+    setChallenge(null);
     client.removeQueries({
       predicate: (query) => query.queryKey[0] !== 'identity',
     });
     client.getMutationCache().clear();
     client.setQueryData(['identity'], null);
     await clearPushState().catch(() => {});
+    return true;
   }
   return (
     <Context.Provider
       value={{
         me: identity.data ?? null,
-        loading: identity.isPending,
+        loading: identity.isPending || pendingCleanups > 0,
+        resolved: identity.data !== undefined,
         error: identity.error,
         challenge,
         setChallenge,

@@ -93,7 +93,7 @@ it('does not fetch credentials until explicit enrollment and requires both proof
   );
   mockApi.mockResolvedValueOnce({ success: true });
   fireEvent.press(button);
-  await waitFor(() => expect(mockForget).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(mockForget).toHaveBeenCalledWith('user-a'));
   expect(mockApi).toHaveBeenLastCalledWith(
     '/account/recovery/confirm',
     expect.anything(),
