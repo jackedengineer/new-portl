@@ -72,8 +72,8 @@ async function login(index = users.length) {
           ...body,
           policyAcceptance: {
             adult: true,
-            termsVersion: '2026-10-13',
-            privacyVersion: '2026-10-13',
+            termsVersion: '2026-10-14',
+            privacyVersion: '2026-10-14',
           },
         }),
       }),
