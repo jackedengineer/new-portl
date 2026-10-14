@@ -46,6 +46,14 @@ export async function checkEmailChange(
       : null;
     if (!current || !user || user.deletionRequestedAt || !user.emailVerified)
       return Response.json({ message: 'Sign in to continue' }, { status: 401 });
+    if (user.isReviewer)
+      return Response.json(
+        {
+          code: 'SHARED_REVIEW_ACCOUNT',
+          message: 'This shared fictional account is managed by the operator.',
+        },
+        { status: 403 },
+      );
     if (request.headers.get('x-portl-expected-user') !== user.id)
       return Response.json(
         { message: 'Your account changed. Reopen this screen.' },
@@ -54,6 +62,15 @@ export async function checkEmailChange(
     if (verifyCurrent && inputBody.email !== user.email)
       return Response.json(
         { message: 'Verify your current account email' },
+        { status: 400 },
+      );
+    if (
+      emailChange &&
+      typeof inputBody.newEmail === 'string' &&
+      inputBody.newEmail.toLowerCase().endsWith('@review.portl.invalid')
+    )
+      return Response.json(
+        { message: 'This email address is reserved.' },
         { status: 400 },
       );
     if (

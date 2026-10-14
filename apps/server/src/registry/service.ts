@@ -1,3 +1,4 @@
+import { assertReviewTarget } from '../reviewer/service.js';
 import { randomBytes } from 'node:crypto';
 import type {
   ApplicationInput,
@@ -287,6 +288,7 @@ export function registryService(db: PrismaClient) {
       withActor(db, actor, async (tx) => {
         await requireAdmin(tx, actor, societyId);
         await validFlat(tx, societyId, input.flatId);
+        await assertReviewTarget(tx, societyId, input.email, 'RESIDENT');
         const token = randomBytes(32).toString('base64url');
         const row = await tx.invitation.create({
           data: {

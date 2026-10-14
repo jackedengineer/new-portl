@@ -10,6 +10,8 @@ datasource db {
 }
 
 model User {
+  isReviewer Boolean @default(false)
+  reviewerAccount ReviewerAccount?
   operatorRecoveries OperatorRecovery[]
   id            String    @id
   name          String
@@ -37,6 +39,7 @@ model User {
 }
 
 model Session {
+  reviewerSession ReviewerSession?
   id        String   @id
   expiresAt DateTime
   token     String   @unique
@@ -147,6 +150,7 @@ enum ApplicationStatus {
   @@schema("portl_registry")
 }
 model Society {
+  reviewRealm ReviewRealm?
   operatorRecoveries OperatorRecovery[]
   directory DirectoryEntry[]
   id String @id @default(uuid())
@@ -595,5 +599,36 @@ model OperatorRecovery {
   expiresAt DateTime
   completedAt DateTime?
   @@index([userId, createdAt])
+  @@schema("portl_auth")
+}
+
+model ReviewRealm {
+  id String @id @default("play-review")
+  societyId String @unique
+  society Society @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  enabled Boolean @default(false)
+  accounts ReviewerAccount[]
+  @@schema("portl_auth")
+}
+model ReviewerAccount {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  realmId String
+  realm ReviewRealm @relation(fields: [realmId], references: [id], onDelete: Restrict)
+  role SocietyRole
+  keyHash String
+  generation Int @default(1)
+  enabled Boolean @default(true)
+  sessions ReviewerSession[]
+  @@unique([realmId, role])
+  @@schema("portl_auth")
+}
+model ReviewerSession {
+  sessionId String @id
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId String
+  account ReviewerAccount @relation(fields: [userId], references: [userId], onDelete: Restrict)
+  generation Int
+  @@index([userId])
   @@schema("portl_auth")
 }

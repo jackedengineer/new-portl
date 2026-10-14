@@ -171,6 +171,7 @@ export function createApp(logger?: Logger, services?: AppServices) {
       res.json({
         user: { id, email, name, emailVerified },
         policyRequired,
+        reviewer: await services.auth.reviewer.identity(id),
         memberships,
         onboardingRequired: memberships.length === 0,
         adminAssuredUntil:

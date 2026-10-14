@@ -65,6 +65,7 @@ export function structureService(db: PrismaClient) {
       input: { id: string; towerId: string; label: string },
     ) =>
       adminWork(db, actor, sid, async (tx) => {
+        await tx.$queryRaw`SELECT id FROM portl_registry."Tower" WHERE id=${input.towerId} AND "societyId"=${sid} AND NOT archived FOR SHARE`;
         const tower = await tx.tower.findFirst({
           where: { id: input.towerId, societyId: sid, archived: false },
         });

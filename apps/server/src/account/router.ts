@@ -1,3 +1,4 @@
+import { sharedReviewAccount } from '../reviewer/service.js';
 import { recoveryEnrollInput, recoveryConfirmInput } from '@portl/contracts';
 import express from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
@@ -102,6 +103,11 @@ export function accountRouter(auth: PortlAuth) {
         'IDENTITY_CHANGED',
         'Your account changed. Reopen this screen.',
       );
+    if (
+      req.path.startsWith('/recovery') &&
+      (await auth.reviewer.identity(session.user.id))
+    )
+      throw sharedReviewAccount();
     await accountBudget(auth, session.user.id, 'account-private', 30, 60);
     res.locals.session = session;
     next();

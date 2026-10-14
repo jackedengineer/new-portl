@@ -1,3 +1,5 @@
+import { reviewerPlugin } from '../reviewer/plugin.js';
+import { reviewerService } from '../reviewer/service.js';
 import { adminRecoveryService } from '../recovery/service.js';
 import { checkEmailChange } from '../account/email-auth.js';
 import { POLICY_VERSION, policyAcceptanceInput } from '@portl/contracts';
@@ -34,6 +36,8 @@ export const authRoutes = new Map([
   ['/email-otp/send-verification-otp', 'POST'],
   ['/sign-in/email-otp', 'POST'],
   ['/get-session', 'GET'],
+  ['/reviewer/sign-in', 'POST'],
+  ['/reviewer/reauthenticate', 'POST'],
   ['/email-otp/request-email-change', 'POST'],
   ['/email-otp/change-email', 'POST'],
   ['/sign-out', 'POST'],
@@ -50,6 +54,7 @@ export function createAuth(
     accountProof(env.BETTER_AUTH_SECRET),
     deliver,
   );
+  const reviewer = reviewerService(db, env.BETTER_AUTH_SECRET);
   const delivery = new AsyncLocalStorage<{ failed: boolean }>();
   const digest = (otp: string) =>
     createHmac('sha256', env.BETTER_AUTH_SECRET)
@@ -85,6 +90,8 @@ export function createAuth(
       customRules: {
         '/email-otp/send-verification-otp': { window: 60, max: 3 },
         '/sign-in/email-otp': { window: 600, max: 10 },
+        '/reviewer/sign-in': { window: 600, max: 10 },
+        '/reviewer/reauthenticate': { window: 600, max: 10 },
       },
     },
     hooks: {
@@ -106,6 +113,17 @@ export function createAuth(
               message: 'Invalid email address',
             });
           ctx.body.email = email.data;
+          const identity = await db.user.findUnique({
+            where: { email: email.data },
+            select: { isReviewer: true },
+          });
+          if (
+            identity?.isReviewer ||
+            email.data.endsWith('@review.portl.invalid')
+          )
+            throw new APIError('FORBIDDEN', {
+              message: 'Use Reviewer access for shared fictional accounts.',
+            });
           if (
             ctx.path === '/sign-in/email-otp' &&
             !policyAcceptanceInput.safeParse(ctx.body.policyAcceptance).success
@@ -172,6 +190,7 @@ export function createAuth(
     },
     plugins: [
       expo(),
+      reviewerPlugin(reviewer, env.TRUSTED_ORIGINS),
       twoFactor({ issuer: 'Portl', allowPasswordless: true }),
       emailOTP({
         changeEmail: { enabled: true, verifyCurrentEmail: true },
@@ -227,10 +246,15 @@ export function createAuth(
   });
   return {
     accounts,
+    reviewer,
     recovery: adminRecoveryService(db, env.BETTER_AUTH_SECRET),
     accountSession: async (input: { headers: Headers }) => {
       const session = await auth.api.getSession(input);
-      if (!session) return null;
+      if (
+        !session ||
+        !(await reviewer.allowed(session.user.id, session.session.id))
+      )
+        return null;
       const user = await db.user.findUnique({
         where: { id: session.user.id },
         select: { deletionRequestedAt: true },
@@ -240,7 +264,11 @@ export function createAuth(
     api: {
       getSession: async (input: { headers: Headers }) => {
         const session = await auth.api.getSession(input);
-        if (!session) return null;
+        if (
+          !session ||
+          !(await reviewer.allowed(session.user.id, session.session.id))
+        )
+          return null;
         const policy = await db.accountPolicy.findFirst({
           where: {
             userId: session.user.id,
@@ -257,6 +285,16 @@ export function createAuth(
       consumeBudget(db, env.BETTER_AUTH_SECRET, subject, bucket, max, seconds),
     handler(request: Request) {
       return delivery.run({ failed: false }, async () => {
+        if (new URL(request.url).pathname.endsWith('/get-session')) {
+          const session = await auth.api.getSession({
+            headers: request.headers,
+          });
+          if (
+            session &&
+            !(await reviewer.allowed(session.user.id, session.session.id))
+          )
+            return Response.json(null);
+        }
         const emailFailure = await checkEmailChange(
           request,
           db,
