@@ -70,6 +70,15 @@ export default function Community() {
       <Title>
         {me.memberships.length ? 'Welcome home.' : 'Let’s find your community.'}
       </Title>
+      {me.reviewer && (
+        <>
+          <Badge>Shared fictional reviewer account</Badge>
+          <Copy small>
+            Use fictional data only. Activity is shared with other reviewers and
+            may be reset by the operator.
+          </Copy>
+        </>
+      )}
       <Copy>Signed in as {me.user.email}</Copy>
       <Button
         label="Account & privacy"

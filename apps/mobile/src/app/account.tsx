@@ -46,6 +46,18 @@ export default function Account() {
     <Screen back eyebrow="Your account">
       <Title>Account &amp; privacy</Title>
       <Copy>{me.user.email}</Copy>
+      {me.reviewer && (
+        <Card>
+          <Label>Shared fictional reviewer account</Label>
+          <Copy>
+            Use fictional data only. Activity is visible to other reviewers and
+            may be reset by the operator. Email change, personal recovery and
+            account deletion are unavailable for this operator-owned identity.
+            Contact support to remove accidentally entered personal information.
+            You can sign out or revoke sessions below.
+          </Copy>
+        </Card>
+      )}
       {me.policyRequired ? (
         <Card>
           <Label>Before joining your community</Label>
@@ -123,19 +135,23 @@ export default function Account() {
           ))
         )}
       </Card>
-      {!me.policyRequired && (
+      {!me.policyRequired && !me.reviewer && (
         <AdminRecovery key={`recovery-${me.user.id}`} userId={me.user.id} />
       )}
-      <ChangeEmail
-        key={`email-${me.user.id}`}
-        userId={me.user.id}
-        email={me.user.email}
-      />
-      <DeleteAccount
-        key={me.user.id}
-        userId={me.user.id}
-        email={me.user.email}
-      />
+      {!me.reviewer && (
+        <>
+          <ChangeEmail
+            key={`email-${me.user.id}`}
+            userId={me.user.id}
+            email={me.user.email}
+          />
+          <DeleteAccount
+            key={me.user.id}
+            userId={me.user.id}
+            email={me.user.email}
+          />
+        </>
+      )}
       <ErrorMessage message={action.error ? messageOf(action.error) : ''} />
       <Button
         label="Sign out"
