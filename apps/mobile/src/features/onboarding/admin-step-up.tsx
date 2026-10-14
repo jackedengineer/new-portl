@@ -14,6 +14,7 @@ import {
 
 export function AdminStepUp({ societyName }: { societyName: string }) {
   const { me, refresh } = useSession();
+  const review = me?.reviewer?.role === 'ADMIN';
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
@@ -21,17 +22,22 @@ export function AdminStepUp({ societyName }: { societyName: string }) {
     setError('');
     setPending(true);
     try {
-      const result = await authClient.twoFactor.verifyTotp({
-        code,
-        trustDevice: false,
-      });
+      const result = review
+        ? await authClient.$fetch('/reviewer/reauthenticate', {
+            method: 'POST',
+            headers: { 'x-portl-expected-user': me!.user.id },
+            body: { accessKey: code },
+          })
+        : await authClient.twoFactor.verifyTotp({ code, trustDevice: false });
       if (result.error)
         throw new Error(
           result.error.status === 429
             ? 'Too many attempts. Please wait before trying again.'
             : result.error.status === 409
               ? 'This code was already used. Wait for a new code in your authenticator.'
-              : 'We couldn’t verify this authenticator code. Try the current code.',
+              : review
+                ? 'Review access is unavailable or the key is incorrect.'
+                : 'We couldn’t verify this authenticator code. Try the current code.',
         );
       setCode('');
       await refresh();
@@ -46,27 +52,34 @@ export function AdminStepUp({ societyName }: { societyName: string }) {
       <Badge>{societyName}</Badge>
       <Title>One more check.</Title>
       <Copy>
-        Enter the current code from your authenticator app to manage resident
-        access. This check lasts 15 minutes.
+        {review
+          ? 'Enter the admin review key to continue managing this fictional society.'
+          : 'Enter the current code from your authenticator app to manage resident access.'}{' '}
+        This check lasts 15 minutes.
       </Copy>
-      {me?.adminAuthenticatorConfigured ? (
+      {review || me?.adminAuthenticatorConfigured ? (
         <>
           <Field
-            label="Authenticator code"
+            label={review ? 'Review access key' : 'Authenticator code'}
             value={code}
             onChangeText={(value) =>
-              setCode(value.replace(/\D/g, '').slice(0, 6))
+              setCode(review ? value : value.replace(/\D/g, '').slice(0, 6))
             }
-            keyboardType="number-pad"
+            keyboardType={review ? 'default' : 'number-pad'}
+            secureTextEntry={review}
+            autoCapitalize="none"
+            autoCorrect={false}
             autoComplete="off"
-            maxLength={6}
+            maxLength={review ? 43 : 6}
             editable={!pending}
             onSubmitEditing={() => void verify()}
           />
           <ErrorMessage message={error} />
           <Button
             label="Verify admin access"
-            disabled={code.length !== 6}
+            disabled={
+              review ? !/^[A-Za-z0-9_-]{43}$/.test(code) : code.length !== 6
+            }
             pending={pending}
             onPress={() => void verify()}
           />
@@ -78,8 +91,9 @@ export function AdminStepUp({ societyName }: { societyName: string }) {
         </Copy>
       )}
       <Copy small>
-        Lost your authenticator? Contact the operator for verified recovery.
-        Email sign-in alone cannot unlock admin access.
+        {review
+          ? 'Review keys are managed by the operator. This access is limited to the fictional society.'
+          : 'Lost your authenticator? Contact the operator for verified recovery. Email sign-in alone cannot unlock admin access.'}
       </Copy>
     </Screen>
   );

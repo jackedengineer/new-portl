@@ -98,6 +98,12 @@ export default function Login() {
         onPress={() => void submit()}
       />
       <Button
+        label="Reviewer access"
+        variant="quiet"
+        disabled={pending}
+        onPress={() => router.push('/reviewer')}
+      />
+      <Button
         label="Deletion status"
         variant="quiet"
         onPress={() => router.push('/deletion-status')}
