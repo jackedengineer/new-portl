@@ -1,3 +1,4 @@
+import { assertReviewTarget } from '../reviewer/service.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import {
   audit,
@@ -41,6 +42,7 @@ export function gateAdmin(db: PrismaClient) {
           }))
         )
           throw missing();
+        await assertReviewTarget(tx, sid, input.email, 'GUARD');
         const [user] = await tx.$queryRaw<
           { id: string }[]
         >`SELECT id FROM portl_auth."User" WHERE email=${input.email} AND "emailVerified" AND "deletionRequestedAt" IS NULL FOR SHARE`;

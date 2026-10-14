@@ -3,6 +3,13 @@ import pg from 'pg';
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
   await client.query(
+    `GRANT SELECT ON portl_auth."ReviewRealm",portl_auth."ReviewerAccount",portl_auth."ReviewerSession" TO ${who}`,
+  );
+  await client.query(`GRANT INSERT ON portl_auth."ReviewerSession" TO ${who}`);
+  await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_auth.reviewer_session_allowed(text,text),portl_auth.reviewer_society_allowed(text),portl_auth.reviewer_target_allowed(text,text,text) TO ${who}`,
+  );
+  await client.query(
     `GRANT EXECUTE ON FUNCTION portl_auth.admin_recovery_view(text,text),portl_auth.complete_admin_recovery(text,text,text,text,boolean,text) TO ${who}`,
   );
   await client.query(

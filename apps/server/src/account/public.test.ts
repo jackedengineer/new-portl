@@ -52,3 +52,21 @@ it('requires the revised policy without silently accepting the earlier edition',
     }).success,
   ).toBe(true);
 });
+
+it('discloses shared review identities and their lifecycle limits separately from personal accounts', async () => {
+  const review = await request(app).get('/reviewer-access');
+  expect(review.status).toBe(200);
+  for (const detail of [
+    'fictional',
+    'shared',
+    'operator',
+    'email change',
+    'account deletion',
+    'personal information',
+    'device registration',
+  ])
+    expect(review.text).toContain(detail);
+  expect((await request(app).get('/terms')).text).toContain(
+    'operator-owned reviewer identities',
+  );
+});

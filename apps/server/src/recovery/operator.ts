@@ -66,7 +66,7 @@ export async function prepareRecovery(
     async (tx) => {
       const [user] = await tx.$queryRaw<
         { id: string; email: string }[]
-      >`SELECT u.id,u.email FROM portl_auth."User" u JOIN portl_auth."AccountPolicy" p ON p."userId"=u.id WHERE u.email=${input.targetEmail} AND u."emailVerified" AND u."deletionRequestedAt" IS NULL AND p.adult AND p.version=${POLICY_VERSION} FOR UPDATE OF u`;
+      >`SELECT u.id,u.email FROM portl_auth."User" u JOIN portl_auth."AccountPolicy" p ON p."userId"=u.id WHERE u.email=${input.targetEmail} AND NOT u."isReviewer" AND u."emailVerified" AND u."deletionRequestedAt" IS NULL AND p.adult AND p.version=${POLICY_VERSION} FOR UPDATE OF u`;
       if (!user)
         throw new Error(
           'Target must sign in and accept the current adult-account policy first',

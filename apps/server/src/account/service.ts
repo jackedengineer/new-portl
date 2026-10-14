@@ -45,7 +45,7 @@ export function accountService(
       const challenge = await db.$transaction(async (tx) => {
         const users = await tx.$queryRaw<
           { id: string }[]
-        >`SELECT id FROM portl_auth."User" WHERE email=${email} AND "emailVerified" AND "deletionRequestedAt" IS NULL FOR UPDATE`;
+        >`SELECT id FROM portl_auth."User" WHERE email=${email} AND NOT "isReviewer" AND "emailVerified" AND "deletionRequestedAt" IS NULL FOR UPDATE`;
         const user = users[0];
         if (!user) return null;
         const data = { id, userId: user.id, email };

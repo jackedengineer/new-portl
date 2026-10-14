@@ -7,6 +7,8 @@ import {
 } from './common.ts';
 export * from './common.ts';
 export * from './gate.ts';
+export * from './reviewer.ts';
+import { reviewerIdentitySchema } from './reviewer.ts';
 
 export const tokenInput = z.strictObject({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
@@ -61,6 +63,7 @@ export const meSchema = z.object({
   policyRequired: z.boolean(),
   adminAssuredUntil: z.string().nullable(),
   adminAuthenticatorConfigured: z.boolean(),
+  reviewer: reviewerIdentitySchema.nullable().optional(),
 });
 export const applicationSchema = z.object({
   id: idSchema,
