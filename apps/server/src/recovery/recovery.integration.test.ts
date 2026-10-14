@@ -175,6 +175,30 @@ it('requires verified current-policy identities and an eligible recovery scope',
     ),
   ).rejects.toThrow('active admin');
 });
+
+it('keeps database recovery guards aligned with the revised accepted policy', async () => {
+  const f = await fixture(true);
+  await owner.accountPolicy.update({
+    where: { userId: f.uid },
+    data: { version: '2026-10-13' },
+  });
+  const view = () =>
+    db.$queryRaw`SELECT portl_auth.admin_recovery_view(${f.uid},${f.sessionId})`;
+  const complete = () =>
+    db.$queryRaw<
+      { result: string }[]
+    >`SELECT portl_auth.complete_admin_recovery(${randomUUID()},${f.uid},${f.sessionId},'unused',false,'unused') AS result`;
+  await expect(view()).rejects.toThrow('Account authorization required');
+  expect((await complete())[0]?.result).toBe('UNAVAILABLE');
+
+  await owner.accountPolicy.update({
+    where: { userId: f.uid },
+    data: { version: POLICY_VERSION },
+  });
+  await expect(view()).resolves.toHaveLength(1);
+  // Current acceptance reaches request validation, without performing recovery.
+  expect((await complete())[0]?.result).toBe('INVALID');
+});
 it('commits wrong attempts and locks the request after three failures without granting access', async () => {
   const f = await fixture(),
     r = await f.prepare(),

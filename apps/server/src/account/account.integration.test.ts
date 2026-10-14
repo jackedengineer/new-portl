@@ -71,8 +71,8 @@ beforeAll(async () => {
           ...body,
           policyAcceptance: {
             adult: true,
-            termsVersion: '2026-10-13',
-            privacyVersion: '2026-10-13',
+            termsVersion: '2026-10-14',
+            privacyVersion: '2026-10-14',
           },
         }),
       }),
@@ -343,6 +343,31 @@ it('persists wrong attempts, rejects expired and account-substituted proofs', as
   ).toEqual({ deletionRequestedAt: null });
 });
 it('gates existing sessions until adult policy acceptance, while keeping deletion and legal pages accessible', async () => {
+  await db.accountPolicy.update({
+    where: { userId: uid },
+    data: { version: '2026-10-13' },
+  });
+  expect(
+    (await request(app).get('/v1/me').set('cookie', cookie)).body
+      .policyRequired,
+  ).toBe(true);
+  expect(
+    await auth.api.getSession({ headers: new Headers({ cookie }) }),
+  ).toBeNull();
+  expect(
+    (
+      await request(app)
+        .post('/v1/account/accept-policy')
+        .set('cookie', cookie)
+        .set('expo-origin', 'portl://')
+        .set('x-portl-expected-user', uid)
+        .send({
+          adult: true,
+          termsVersion: '2026-10-13',
+          privacyVersion: '2026-10-13',
+        })
+    ).status,
+  ).toBe(422);
   await db.accountPolicy.delete({ where: { userId: uid } });
   expect(
     await auth.api.getSession({ headers: new Headers({ cookie }) }),
@@ -368,8 +393,8 @@ it('gates existing sessions until adult policy acceptance, while keeping deletio
     (
       await route().send({
         adult: false,
-        termsVersion: '2026-10-13',
-        privacyVersion: '2026-10-13',
+        termsVersion: '2026-10-14',
+        privacyVersion: '2026-10-14',
       })
     ).status,
   ).toBe(422);
@@ -377,8 +402,8 @@ it('gates existing sessions until adult policy acceptance, while keeping deletio
     (
       await route().send({
         adult: true,
-        termsVersion: '2026-10-13',
-        privacyVersion: '2026-10-13',
+        termsVersion: '2026-10-14',
+        privacyVersion: '2026-10-14',
       })
     ).status,
   ).toBe(200);

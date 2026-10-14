@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { emailSchema, idSchema } from './common.ts';
 
-export const POLICY_VERSION = '2026-10-13';
+export const POLICY_VERSION = '2026-10-14';
 export const policyAcceptanceInput = z.strictObject({
   adult: z.literal(true),
   termsVersion: z.literal(POLICY_VERSION),

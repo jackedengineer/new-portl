@@ -101,8 +101,8 @@ it('verifies a complete OTP and revalidates server identity before navigation', 
     otp: '123456',
     policyAcceptance: {
       adult: true,
-      termsVersion: '2026-10-13',
-      privacyVersion: '2026-10-13',
+      termsVersion: '2026-10-14',
+      privacyVersion: '2026-10-14',
     },
   });
   expect(mockReplace).toHaveBeenCalledWith('/community');

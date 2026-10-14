@@ -84,7 +84,7 @@ beforeAll(async () => {
     },
   });
   await owner.accountPolicy.create({
-    data: { userId, version: '2026-10-13', adult: true },
+    data: { userId, version: '2026-10-14', adult: true },
   });
   await owner.adminAssurance.create({
     data: { sessionId, expiresAt: new Date(Date.now() + 600000) },
