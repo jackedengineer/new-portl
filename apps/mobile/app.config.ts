@@ -26,6 +26,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       ...config.android,
       package: 'dev.jacked.portl',
+      // V1 stores app data privately and never uses biometrics. Only the
+      // development client needs the overlay permission for its debug menu.
+      blockedPermissions: [
+        ...(config.android?.blockedPermissions ?? []),
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.USE_BIOMETRIC',
+        'android.permission.USE_FINGERPRINT',
+        ...(process.env.EAS_BUILD_PROFILE === 'development'
+          ? []
+          : ['android.permission.SYSTEM_ALERT_WINDOW']),
+      ],
       ...(existsSync(googleServices)
         ? { googleServicesFile: googleServices }
         : {}),
