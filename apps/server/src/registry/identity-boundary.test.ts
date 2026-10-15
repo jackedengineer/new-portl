@@ -103,6 +103,7 @@ const cases = [
 
 function app() {
   const auth = {
+    lifecycle: { identity: async () => null },
     api: {
       getSession: async () => ({
         user: {

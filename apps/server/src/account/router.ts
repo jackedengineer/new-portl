@@ -1,5 +1,9 @@
 import { sharedReviewAccount } from '../reviewer/service.js';
-import { recoveryEnrollInput, recoveryConfirmInput } from '@portl/contracts';
+import {
+  recoveryEnrollInput,
+  recoveryConfirmInput,
+  reviewCodeInput,
+} from '@portl/contracts';
 import express from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import {
@@ -42,6 +46,10 @@ export async function deletionAction(
   input: unknown,
   ip: string,
 ) {
+  if (action === 'start') {
+    const { email } = parseAccount(deletionStartInput, input);
+    auth.lifecycle.assertDeletionEmail(email);
+  }
   await accountBudget(auth, ip, 'account-public', 30, 60);
   if (action === 'start') {
     const { email } = parseAccount(deletionStartInput, input);
@@ -83,11 +91,13 @@ export function accountRouter(auth: PortlAuth) {
   router.use(express.json({ limit: '8kb' }));
   router.post('/deletion/:action', async (req, res) =>
     res.json(
-      await deletionAction(
-        auth,
-        String(req.params.action),
-        req.body,
-        req.ip || '127.0.0.1',
+      await auth.lifecycleRequest(fromNodeHeaders(req.headers), () =>
+        deletionAction(
+          auth,
+          String(req.params.action),
+          req.body,
+          req.ip || '127.0.0.1',
+        ),
       ),
     ),
   );
@@ -105,12 +115,20 @@ export function accountRouter(auth: PortlAuth) {
       );
     if (
       req.path.startsWith('/recovery') &&
-      (await auth.reviewer.identity(session.user.id))
+      ((await auth.reviewer.identity(session.user.id)) ||
+        (await auth.lifecycle.identity(session.user.id)))
     )
       throw sharedReviewAccount();
     await accountBudget(auth, session.user.id, 'account-private', 30, 60);
     res.locals.session = session;
     next();
+  });
+  router.post('/review-code', async (req, res) => {
+    const session = res.locals.session as NonNullable<
+      Awaited<ReturnType<PortlAuth['accountSession']>>
+    >;
+    const { purpose } = parseAccount(reviewCodeInput, req.body);
+    res.json(await auth.lifecycle.code(session, purpose));
   });
   router.get('/recovery', async (_req, res) => {
     const session = res.locals.session as NonNullable<

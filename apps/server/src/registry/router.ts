@@ -23,6 +23,12 @@ export function registryRouter(auth: PortlAuth, db: PrismaClient) {
     });
     if (!session?.user.emailVerified)
       throw new DomainError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+    if (await auth.lifecycle.identity(session.user.id))
+      throw new DomainError(
+        403,
+        'LIFECYCLE_ONLY',
+        'Disposable accounts can only test account lifecycle.',
+      );
     const expectedUserId = req.get('x-portl-expected-user');
     if (expectedUserId && expectedUserId !== session.user.id)
       throw new DomainError(

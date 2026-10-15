@@ -18,6 +18,10 @@ export function accountService(
   db: PrismaClient,
   proof: AccountProof,
   deliver: OtpDelivery,
+  assertLifecycle: (userId: string) => void = () => {
+    throw unavailable();
+  },
+  lifecycleRequest: () => boolean = () => false,
 ) {
   return {
     async accept(userId: string, sessionId: string) {
@@ -44,10 +48,12 @@ export function accountService(
       const otp = String(randomInt(0, 1_000_000)).padStart(6, '0');
       const challenge = await db.$transaction(async (tx) => {
         const users = await tx.$queryRaw<
-          { id: string }[]
-        >`SELECT id FROM portl_auth."User" WHERE email=${email} AND NOT "isReviewer" AND "emailVerified" AND "deletionRequestedAt" IS NULL FOR UPDATE`;
+          { id: string; isReviewLifecycle: boolean }[]
+        >`SELECT id,"isReviewLifecycle" FROM portl_auth."User" WHERE email=${email} AND NOT "isReviewer" AND "emailVerified" AND "deletionRequestedAt" IS NULL FOR UPDATE`;
         const user = users[0];
         if (!user) return null;
+        if (user.isReviewLifecycle || lifecycleRequest())
+          assertLifecycle(user.id);
         const data = { id, userId: user.id, email };
         await tx.deletionChallenge.deleteMany({
           where: { userId: user.id, expiresAt: { lt: new Date() } },
@@ -90,6 +96,12 @@ export function accountService(
             where: { id: input.challengeId, receiptHash },
           });
           if (!candidate) return null;
+          const subject = await tx.user.findUnique({
+            where: { id: candidate.userId },
+            select: { isReviewLifecycle: true },
+          });
+          if (subject?.isReviewLifecycle || lifecycleRequest())
+            assertLifecycle(candidate.userId);
           // All challenge mutations lock User first (send, confirm, email change).
           await tx.$queryRaw`SELECT id FROM portl_auth."User" WHERE id=${candidate.userId} FOR UPDATE`;
           const already = await tx.accountDeletion.findUnique({
