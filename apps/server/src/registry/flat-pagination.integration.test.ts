@@ -24,6 +24,7 @@ const archivedFlatId = randomUUID();
 const code = randomBytes(6).toString('hex').toUpperCase();
 const expected: { id: string; tower: string; label: string }[] = [];
 const auth = {
+  lifecycle: { identity: async () => null },
   api: {
     getSession: async () => ({
       user: {
