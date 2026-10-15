@@ -11,6 +11,9 @@ datasource db {
 
 model User {
   isReviewer Boolean @default(false)
+  isReviewLifecycle Boolean @default(false)
+  reviewLifecycle ReviewLifecycle?
+  reviewCodes ReviewLifecycleCode[]
   reviewerAccount ReviewerAccount?
   operatorRecoveries OperatorRecovery[]
   id            String    @id
@@ -630,5 +633,30 @@ model ReviewerSession {
   account ReviewerAccount @relation(fields: [userId], references: [userId], onDelete: Restrict)
   generation Int
   @@index([userId])
+  @@schema("portl_auth")
+}
+
+model ReviewLifecycle {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId String
+  parentSessionId String
+  generation Int
+  purpose String
+  originalEmail String @unique
+  nextEmail String @unique
+  expiresAt DateTime
+  @@unique([parentSessionId, purpose])
+  @@index([parentId])
+  @@schema("portl_auth")
+}
+model ReviewLifecycleCode {
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose String
+  email String
+  cipherText String
+  expiresAt DateTime
+  @@id([userId, purpose])
   @@schema("portl_auth")
 }

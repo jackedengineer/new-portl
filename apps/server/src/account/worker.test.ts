@@ -17,7 +17,7 @@ it.each([false, true])(
     const query = vi.fn(async (parts: TemplateStringsArray) => {
       const sql = parts.join('');
       if (sql.includes('has_function_privilege'))
-        return [{ process: true, cleanup: true }];
+        return [{ process: true, cleanup: true, lifecycle: true }];
       if (sql.includes('account_deletion_ledger'))
         return [{ subjectHash, expiresAt }];
       if (sql.includes('process_account_deletion')) {
@@ -41,7 +41,7 @@ it.each([false, true])(
       );
       await stop();
       expect(processed).toBe(!unavailable);
-      expect(execute).toHaveBeenCalledTimes(unavailable ? 0 : 1);
+      expect(execute).toHaveBeenCalledTimes(unavailable ? 0 : 2);
       expect(logger.error).toHaveBeenCalledTimes(unavailable ? 1 : 0);
     } finally {
       await rm(path, { recursive: true, force: true });

@@ -1,3 +1,4 @@
+import { reviewLifecycle, lifecycleEmail } from '../reviewer/lifecycle.js';
 import { reviewerPlugin } from '../reviewer/plugin.js';
 import { reviewerService } from '../reviewer/service.js';
 import { adminRecoveryService } from '../recovery/service.js';
@@ -6,6 +7,7 @@ import { POLICY_VERSION, policyAcceptanceInput } from '@portl/contracts';
 import { accountService } from '../account/service.js';
 import { accountProof } from '../account/proof.js';
 import { createHmac } from 'node:crypto';
+import { DomainError } from '../registry/context.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { prismaAdapter } from '@better-auth/prisma-adapter';
@@ -37,6 +39,7 @@ export const authRoutes = new Map([
   ['/sign-in/email-otp', 'POST'],
   ['/get-session', 'GET'],
   ['/reviewer/sign-in', 'POST'],
+  ['/reviewer/lifecycle', 'POST'],
   ['/reviewer/reauthenticate', 'POST'],
   ['/email-otp/request-email-change', 'POST'],
   ['/email-otp/change-email', 'POST'],
@@ -49,10 +52,16 @@ export function createAuth(
   env: AuthEnv,
   deliver: OtpDelivery,
 ) {
+  const lifecycle = reviewLifecycle(db, env.BETTER_AUTH_SECRET);
+  const dispatch: OtpDelivery = async (message) => {
+    if (!(await lifecycle.capture(message))) await deliver(message);
+  };
   const accounts = accountService(
     db,
     accountProof(env.BETTER_AUTH_SECRET),
-    deliver,
+    dispatch,
+    lifecycle.assert,
+    lifecycle.active,
   );
   const reviewer = reviewerService(db, env.BETTER_AUTH_SECRET);
   const delivery = new AsyncLocalStorage<{ failed: boolean }>();
@@ -91,6 +100,7 @@ export function createAuth(
         '/email-otp/send-verification-otp': { window: 60, max: 3 },
         '/sign-in/email-otp': { window: 600, max: 10 },
         '/reviewer/sign-in': { window: 600, max: 10 },
+        '/reviewer/lifecycle': { window: 600, max: 6 },
         '/reviewer/reauthenticate': { window: 600, max: 10 },
       },
     },
@@ -113,13 +123,31 @@ export function createAuth(
               message: 'Invalid email address',
             });
           ctx.body.email = email.data;
+          if (
+            lifecycle.active() &&
+            !(
+              ctx.path === '/email-otp/send-verification-otp' &&
+              ctx.body.type === 'email-verification' &&
+              lifecycle.permits(email.data, 'verify-current-email')
+            )
+          )
+            throw new APIError('FORBIDDEN', {
+              message:
+                'Disposable accounts use their allocated synthetic verification addresses only.',
+            });
           const identity = await db.user.findUnique({
             where: { email: email.data },
             select: { isReviewer: true },
           });
           if (
             identity?.isReviewer ||
-            email.data.endsWith('@review.portl.invalid')
+            ((email.data.endsWith('@review.portl.invalid') ||
+              lifecycleEmail(email.data)) &&
+              !(
+                ctx.path === '/email-otp/send-verification-otp' &&
+                ctx.body.type === 'email-verification' &&
+                lifecycle.permits(email.data, 'verify-current-email')
+              ))
           )
             throw new APIError('FORBIDDEN', {
               message: 'Use Reviewer access for shared fictional accounts.',
@@ -190,7 +218,7 @@ export function createAuth(
     },
     plugins: [
       expo(),
-      reviewerPlugin(reviewer, env.TRUSTED_ORIGINS),
+      reviewerPlugin(reviewer, lifecycle, env.TRUSTED_ORIGINS),
       twoFactor({ issuer: 'Portl', allowPasswordless: true }),
       emailOTP({
         changeEmail: { enabled: true, verifyCurrentEmail: true },
@@ -214,7 +242,7 @@ export function createAuth(
             });
             if (!challenge) throw new Error('Email challenge unavailable');
             expiresAt = challenge.expiresAt;
-            await deliver({
+            await dispatch({
               email,
               otp,
               purpose:
@@ -244,9 +272,12 @@ export function createAuth(
       }),
     ],
   });
-  return {
+  const service = {
     accounts,
     reviewer,
+    lifecycle,
+    lifecycleRequest: async <T>(headers: Headers, work: () => Promise<T>) =>
+      lifecycle.run(await auth.api.getSession({ headers }), work),
     recovery: adminRecoveryService(db, env.BETTER_AUTH_SECRET),
     accountSession: async (input: { headers: Headers }) => {
       const session = await auth.api.getSession(input);
@@ -300,7 +331,14 @@ export function createAuth(
           db,
           env.BETTER_AUTH_SECRET,
           env.TRUSTED_ORIGINS,
-          auth.api.getSession,
+          lifecycle,
+          async (input) => {
+            const session = await auth.api.getSession(input);
+            return session &&
+              (await reviewer.allowed(session.user.id, session.session.id))
+              ? session
+              : null;
+          },
         );
         if (emailFailure) return emailFailure;
         let adminSession: Awaited<ReturnType<typeof auth.api.getSession>> =
@@ -394,7 +432,9 @@ export function createAuth(
           const data = await response.clone().json();
           const session =
             typeof data.token === 'string'
-              ? await db.session.findUnique({ where: { token: data.token } })
+              ? await db.session.findUnique({
+                  where: { token: data.token },
+                })
               : null;
           if (session) {
             const current = await db.user.findUnique({
@@ -455,6 +495,26 @@ export function createAuth(
           { status: 503, headers: { 'retry-after': '60' } },
         );
       });
+    },
+  };
+  return {
+    ...service,
+    async handler(request: Request) {
+      try {
+        const session =
+          new URL(request.url).pathname.includes('/email-otp/') ||
+          new URL(request.url).pathname.endsWith('/sign-in/email-otp')
+            ? await auth.api.getSession({ headers: request.headers })
+            : null;
+        return await lifecycle.run(session, () => service.handler(request));
+      } catch (error) {
+        if (error instanceof DomainError)
+          return Response.json(
+            { code: error.code, message: error.message },
+            { status: error.status },
+          );
+        throw error;
+      }
     },
   };
 }

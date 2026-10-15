@@ -2,6 +2,13 @@ import pg from 'pg';
 
 export async function grantRuntime(client: pg.Client, role: string) {
   const who = pg.escapeIdentifier(role);
+  await client.query(`GRANT SELECT ON portl_auth."ReviewLifecycle" TO ${who}`);
+  await client.query(
+    `GRANT SELECT,INSERT,UPDATE,DELETE ON portl_auth."ReviewLifecycleCode" TO ${who}`,
+  );
+  await client.query(
+    `GRANT EXECUTE ON FUNCTION portl_auth.allocate_review_lifecycle(text,text,text,text),portl_auth.lifecycle_parent_allowed(text) TO ${who}`,
+  );
   await client.query(
     `GRANT SELECT ON portl_auth."ReviewRealm",portl_auth."ReviewerAccount",portl_auth."ReviewerSession" TO ${who}`,
   );

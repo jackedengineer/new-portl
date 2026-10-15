@@ -5,12 +5,21 @@ import {
   sessionMiddleware,
 } from 'better-auth/api';
 import { setSessionCookie } from 'better-auth/cookies';
-import { reviewerSignInInput, reviewerReauthInput } from '@portl/contracts';
+import {
+  reviewerSignInInput,
+  reviewerReauthInput,
+  reviewLifecycleInput,
+} from '@portl/contracts';
 import type { reviewerService } from './service.js';
 import { DomainError } from '../registry/context.js';
 
+import type { reviewLifecycle } from './lifecycle.js';
 type Service = ReturnType<typeof reviewerService>;
-export function reviewerPlugin(service: Service, origins: string[]) {
+export function reviewerPlugin(
+  service: Service,
+  lifecycle: ReturnType<typeof reviewLifecycle>,
+  origins: string[],
+) {
   const origin = (headers?: Headers) => {
     if (
       !origins.includes(
@@ -62,6 +71,43 @@ export function reviewerPlugin(service: Service, origins: string[]) {
           } catch (error) {
             if (sessionToken)
               await ctx.context.internalAdapter.deleteSession(sessionToken);
+            return failure(error);
+          }
+        },
+      ),
+      reviewerLifecycle: createAuthEndpoint(
+        '/reviewer/lifecycle',
+        {
+          method: 'POST',
+          body: reviewLifecycleInput,
+          use: [sessionMiddleware],
+        },
+        async (ctx) => {
+          origin(ctx.headers);
+          const parent = ctx.context.session;
+          if (ctx.headers?.get('x-portl-expected-user') !== parent.user.id)
+            throw new APIError('UNAUTHORIZED', {
+              message: 'Your account changed. Reopen this screen.',
+            });
+          let token: string | undefined;
+          try {
+            const id = await lifecycle.allocate(parent, ctx.body.purpose);
+            const user = await ctx.context.internalAdapter.findUserById(id);
+            if (!user) throw new Error('Disposable account unavailable');
+            const session = await ctx.context.internalAdapter.createSession(id);
+            if (!session) throw new Error('Disposable session unavailable');
+            token = session.token;
+            await lifecycle.run(
+              { user, session },
+              async () => {
+                await lifecycle.prepareSession(user.id, session.id);
+                await setSessionCookie(ctx, { user, session });
+              },
+              true,
+            );
+            return ctx.json({ success: true });
+          } catch (error) {
+            if (token) await ctx.context.internalAdapter.deleteSession(token);
             return failure(error);
           }
         },

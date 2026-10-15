@@ -8,7 +8,7 @@ import {
 export * from './common.ts';
 export * from './gate.ts';
 export * from './reviewer.ts';
-import { reviewerIdentitySchema } from './reviewer.ts';
+import { reviewerIdentitySchema, reviewLifecycleSchema } from './reviewer.ts';
 
 export const tokenInput = z.strictObject({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
@@ -64,6 +64,7 @@ export const meSchema = z.object({
   adminAssuredUntil: z.string().nullable(),
   adminAuthenticatorConfigured: z.boolean(),
   reviewer: reviewerIdentitySchema.nullable().optional(),
+  reviewLifecycle: reviewLifecycleSchema.nullable().optional(),
 });
 export const applicationSchema = z.object({
   id: idSchema,

@@ -8,6 +8,7 @@ export async function checkEmailChange(
   db: PrismaClient,
   secret: string,
   origins: string[],
+  lifecycle: { permits: (email: string, purpose: 'change-email') => boolean },
   getSession: (input: {
     headers: Headers;
   }) => Promise<{ user: { id: string } } | null>,
@@ -67,11 +68,25 @@ export async function checkEmailChange(
     if (
       emailChange &&
       typeof inputBody.newEmail === 'string' &&
-      inputBody.newEmail.toLowerCase().endsWith('@review.portl.invalid')
+      (inputBody.newEmail.toLowerCase().endsWith('@review.portl.invalid') ||
+        inputBody.newEmail
+          .toLowerCase()
+          .endsWith('@lifecycle.review.portl.invalid')) &&
+      !lifecycle.permits(inputBody.newEmail, 'change-email')
     )
       return Response.json(
         { message: 'This email address is reserved.' },
         { status: 400 },
+      );
+    if (
+      emailChange &&
+      user.isReviewLifecycle &&
+      (typeof inputBody.newEmail !== 'string' ||
+        !lifecycle.permits(inputBody.newEmail, 'change-email'))
+    )
+      return Response.json(
+        { message: 'Use the allocated synthetic email address' },
+        { status: 403 },
       );
     if (
       emailChange &&

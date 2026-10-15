@@ -7,9 +7,9 @@ export async function accountWorker(
   ledgerPath: string,
 ) {
   const [grants] = await db.$queryRaw<
-    { process: boolean; cleanup: boolean }[]
-  >`SELECT has_function_privilege(current_user,'portl_auth.process_account_deletion(text[])','EXECUTE') AS process, has_function_privilege(current_user,'portl_auth.cleanup_account_metadata()','EXECUTE') AS cleanup`;
-  if (!grants?.process || !grants.cleanup)
+    { process: boolean; cleanup: boolean; lifecycle: boolean }[]
+  >`SELECT has_function_privilege(current_user,'portl_auth.process_account_deletion(text[])','EXECUTE') AS process, has_function_privilege(current_user,'portl_auth.cleanup_account_metadata()','EXECUTE') AS cleanup, has_function_privilege(current_user,'portl_auth.cleanup_review_lifecycle()','EXECUTE') AS lifecycle`;
+  if (!grants?.process || !grants.cleanup || !grants.lifecycle)
     throw new Error('Account worker grants missing');
   let stopped = false,
     timer: ReturnType<typeof setTimeout> | undefined,
@@ -27,6 +27,7 @@ export async function accountWorker(
           expiresAt: row.expiresAt.toISOString(),
         })),
       );
+      await db.$executeRaw`SELECT portl_auth.cleanup_review_lifecycle()`;
       if (Date.now() - lastCleanup >= 3600000) {
         await cleanupLedger(ledgerPath);
         await db.$executeRaw`SELECT portl_auth.cleanup_account_metadata()`;
