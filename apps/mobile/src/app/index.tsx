@@ -4,7 +4,13 @@ export default function Index() {
   const { me } = useSession();
   return (
     <Redirect
-      href={me ? (me.policyRequired ? '/account' : '/community') : '/login'}
+      href={
+        me
+          ? me.policyRequired || me.reviewLifecycle
+            ? '/account'
+            : '/community'
+          : '/login'
+      }
     />
   );
 }

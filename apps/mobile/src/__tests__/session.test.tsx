@@ -316,3 +316,45 @@ it.each(['earlier', 'newer'] as const)(
     expect(sessionForTest.loading).toBe(false);
   },
 );
+
+it('blocks sign-out and overlapping switches while a cookie-changing account transition is pending', async () => {
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'review-parent' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'review-parent', email: 'parent@review.portl.invalid' },
+    memberships: [],
+  });
+  const rendered = render(
+    <SessionProvider>
+      <Harness />
+    </SessionProvider>,
+  );
+  await screen.findByText('parent@review.portl.invalid');
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let transition!: Promise<void>;
+  await act(async () => {
+    transition = sessionForTest.changeAccount('review-parent', () => pending);
+  });
+  await screen.findByText('Checking session');
+  const signOutBefore = mockSignOut.mock.calls.length;
+  await expect(sessionForTest.signOut()).rejects.toThrow(
+    'Please wait for the account switch',
+  );
+  await expect(
+    sessionForTest.changeAccount('review-parent', async () => {}),
+  ).rejects.toThrow('Your account changed');
+  expect(mockSignOut.mock.calls.length).toBe(signOutBefore);
+  mockGetSession.mockResolvedValue({ data: { user: { id: 'child' } } });
+  mockApi.mockResolvedValue({
+    user: { id: 'child', email: 'child@lifecycle.review.portl.invalid' },
+    memberships: [],
+  });
+  await act(async () => {
+    release();
+    await transition;
+  });
+  await screen.findByText('child@lifecycle.review.portl.invalid');
+  rendered.unmount();
+});
