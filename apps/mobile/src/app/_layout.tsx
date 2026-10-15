@@ -38,7 +38,13 @@ function Routes() {
           <Stack.Protected guard={!!session.me}>
             <Stack.Screen name="account" />
           </Stack.Protected>
-          <Stack.Protected guard={!!session.me && !session.me.policyRequired}>
+          <Stack.Protected
+            guard={
+              !!session.me &&
+              !session.me.policyRequired &&
+              !session.me.reviewLifecycle
+            }
+          >
             <Stack.Screen name="(member)" />
           </Stack.Protected>
         </Stack>

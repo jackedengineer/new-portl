@@ -1,3 +1,4 @@
+import { ReviewCode } from './review-lifecycle';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { emailSchema } from '@portl/contracts';
 import { authClient } from '../../lib/auth-client';
@@ -14,9 +15,11 @@ import {
 export function ChangeEmail({
   userId,
   email,
+  reviewNextEmail,
 }: {
   userId: string;
   email: string;
+  reviewNextEmail?: string;
 }) {
   const { forgetSession } = useSession();
   const mounted = useRef(true);
@@ -29,7 +32,7 @@ export function ChangeEmail({
   const [stage, setStage] = useState<'start' | 'current' | 'new' | 'done'>(
     'start',
   );
-  const [newEmail, setNewEmail] = useState(''),
+  const [newEmail, setNewEmail] = useState(reviewNextEmail ?? ''),
     [code, setCode] = useState(''),
     [error, setError] = useState(''),
     [pending, setPending] = useState(false);
@@ -88,12 +91,22 @@ export function ChangeEmail({
   return (
     <Card>
       <Label>Change email</Label>
-      <Copy>
-        Verify {email}, then your new address. Your society memberships stay
-        with your account. All sessions and push registrations are revoked after
-        the change; sign in again with the new email. Pending invitations to
-        your old email are removed.
-      </Copy>
+      {reviewNextEmail ? (
+        <Copy>
+          Verify the two allocated synthetic addresses using the codes below.
+          This performs a real email change and signs this disposable account
+          out. Return to Reviewer access with a shared role key to test deletion
+          on a separate disposable account. Abandoned accounts are erased after
+          expiry.
+        </Copy>
+      ) : (
+        <Copy>
+          Verify {email}, then your new address. Your society memberships stay
+          with your account. All sessions and push registrations are revoked
+          after the change; sign in again with the new email. Pending
+          invitations to your old email are removed.
+        </Copy>
+      )}
       {stage === 'start' ? (
         <Button
           label="Verify current email"
@@ -104,11 +117,22 @@ export function ChangeEmail({
       ) : (
         <>
           <Copy>
-            {stage === 'current'
-              ? 'Enter the code sent to your current email.'
-              : 'If your new address is available, a code was requested for it. Check that inbox.'}{' '}
+            {reviewNextEmail
+              ? 'Show the synthetic verification code below and enter it to continue.'
+              : stage === 'current'
+                ? 'Enter the code sent to your current email.'
+                : 'If your new address is available, a code was requested for it. Check that inbox.'}{' '}
             Codes expire in five minutes.
           </Copy>
+          {reviewNextEmail && (
+            <ReviewCode
+              key={stage}
+              userId={userId}
+              purpose={
+                stage === 'current' ? 'verify-current-email' : 'change-email'
+              }
+            />
+          )}
           {stage === 'current' && (
             <Field
               label="New email address"
@@ -118,7 +142,7 @@ export function ChangeEmail({
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={254}
-              editable={!pending}
+              editable={!pending && !reviewNextEmail}
             />
           )}
           <Field

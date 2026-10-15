@@ -12,7 +12,9 @@ export function NotificationBridge() {
     client = useQueryClient();
   const identityReady = !loading && !error;
   const userId =
-    identityReady && !me?.policyRequired ? (me?.user.id ?? null) : null;
+    identityReady && !me?.policyRequired && !me?.reviewLifecycle
+      ? (me?.user.id ?? null)
+      : null;
   const current = useRef(userId);
   useLayoutEffect(() => {
     current.current = userId;

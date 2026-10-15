@@ -64,6 +64,10 @@ type SessionContext = {
   setChallenge: (value: Challenge | null) => void;
   refresh: () => Promise<void>;
   signedIn: () => Promise<void>;
+  changeAccount: (
+    expectedUserId: string,
+    work: () => Promise<void>,
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   forgetSession: (expectedUserId?: string) => Promise<boolean>;
 };
@@ -71,6 +75,8 @@ const Context = createContext<SessionContext | null>(null);
 function Session({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const revision = useRef(0);
+  const switchingAccount = useRef(false),
+    signingOut = useRef(0);
   const [pendingCleanups, setPendingCleanups] = useState(0);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const identity = useQuery({
@@ -113,7 +119,37 @@ function Session({ children }: { children: ReactNode }) {
       queryFn: ({ signal }) => readIdentity(signal),
     });
   }
+  async function changeAccount(
+    expectedUserId: string,
+    work: () => Promise<void>,
+  ) {
+    if (
+      switchingAccount.current ||
+      signingOut.current ||
+      currentUserId() !== expectedUserId
+    )
+      throw new Error('Your account changed. Reopen this screen.');
+    switchingAccount.current = true;
+    const started = ++revision.current;
+    setPendingCleanups((count) => count + 1);
+    try {
+      // Hide every authenticated action before a cookie-changing request can start.
+      await client.cancelQueries();
+      if (revision.current !== started || currentUserId() !== expectedUserId)
+        throw new Error('Your account changed. Reopen this screen.');
+      await work();
+      if (revision.current !== started)
+        throw new Error('Your account changed. Reopen this screen.');
+      await signedIn();
+    } finally {
+      switchingAccount.current = false;
+      setPendingCleanups((count) => count - 1);
+    }
+  }
   async function signOut() {
+    if (switchingAccount.current)
+      throw new Error('Please wait for the account switch to finish.');
+    signingOut.current++;
     const started = ++revision.current;
     const userId = identity.data?.user.id;
     setPendingCleanups((count) => count + 1);
@@ -127,6 +163,7 @@ function Session({ children }: { children: ReactNode }) {
         () => revision.current === started && currentUserId() === userId,
       );
     } finally {
+      signingOut.current--;
       setPendingCleanups((count) => count - 1);
     }
   }
@@ -178,6 +215,7 @@ function Session({ children }: { children: ReactNode }) {
         setChallenge,
         refresh,
         signedIn,
+        changeAccount,
         signOut,
         forgetSession,
       }}

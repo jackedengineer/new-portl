@@ -65,9 +65,11 @@ export default function Reviewer() {
         activity in this society, and the operator can reset it. Enter fictional
         visitor and contact details only. Email change, personal recovery and
         account deletion are unavailable for these shared identities; sign-out
-        and session revocation remain available. Contact support to remove any
-        personal information entered accidentally. Push is optional and uses
-        your real device registration if enabled.
+        and session revocation remain available. In Account & privacy, start a
+        disposable account to test email change or deletion with synthetic codes
+        and no mailbox. Contact support to remove any personal information
+        entered accidentally. Push is optional and uses your real device
+        registration if enabled.
       </Copy>
       {(['RESIDENT', 'GUARD', 'ADMIN'] as const).map((value) => (
         <Button

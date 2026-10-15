@@ -1,3 +1,4 @@
+import { ReviewCode } from './review-lifecycle';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import {
@@ -19,9 +20,11 @@ import { saveReceipt } from './receipt';
 export function DeleteAccount({
   userId,
   email,
+  disposable = false,
 }: {
   userId: string;
   email: string;
+  disposable?: boolean;
 }) {
   const { forgetSession } = useSession();
   const mounted = useRef(true);
@@ -46,6 +49,8 @@ export function DeleteAccount({
         '/account/deletion/start',
         deletionChallengeSchema,
         { email },
+        undefined,
+        userId,
       );
       setChallenge(result);
       setOtp('');
@@ -64,13 +69,19 @@ export function DeleteAccount({
       // Preserve the recovery capability before an irreversible request, even if its response is lost.
       await saveReceipt(challenge.receiptToken);
       if (!mounted.current) return;
-      await api('/account/deletion/confirm', deletionStatusSchema, {
-        challengeId: challenge.challengeId,
-        receiptToken: challenge.receiptToken,
-        otp,
-        confirmation,
-        expectedUserId: userId,
-      });
+      await api(
+        '/account/deletion/confirm',
+        deletionStatusSchema,
+        {
+          challengeId: challenge.challengeId,
+          receiptToken: challenge.receiptToken,
+          otp,
+          confirmation,
+          expectedUserId: userId,
+        },
+        undefined,
+        userId,
+      );
       if (!mounted.current) return;
       if (await forgetSession(userId)) router.replace('/deletion-status');
     } catch (e) {
@@ -116,6 +127,13 @@ export function DeleteAccount({
             receive a code valid for five minutes. Wait one minute before
             requesting another.
           </Copy>
+          {disposable && (
+            <ReviewCode
+              key={challenge.challengeId}
+              userId={userId}
+              purpose="delete-account"
+            />
+          )}
           <Field
             label="Deletion email code"
             value={otp}

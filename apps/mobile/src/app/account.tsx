@@ -1,3 +1,4 @@
+import { StartReviewLifecycle } from '../features/account/review-lifecycle';
 import { AdminRecovery } from '../features/account/recovery';
 import { ChangeEmail } from '../features/account/email-change';
 import { useState } from 'react';
@@ -55,6 +56,25 @@ export default function Account() {
             account deletion are unavailable for this operator-owned identity.
             Contact support to remove accidentally entered personal information.
             You can sign out or revoke sessions below.
+          </Copy>
+        </Card>
+      )}
+      {me.reviewer && (
+        <StartReviewLifecycle
+          key={me.user.id}
+          userId={me.user.id}
+          disabled={action.isPending}
+        />
+      )}
+      {me.reviewLifecycle && (
+        <Card>
+          <Label>Disposable lifecycle review account</Label>
+          <Copy>
+            No society membership or real email delivery. This account expires
+            at {new Date(me.reviewLifecycle.expiresAt).toLocaleString()} and is
+            erased automatically. Email change and deletion use the same
+            verification services as personal accounts. To test another flow,
+            sign out and enter Reviewer access again with a shared role key.
           </Copy>
         </Card>
       )}
@@ -135,21 +155,29 @@ export default function Account() {
           ))
         )}
       </Card>
-      {!me.policyRequired && !me.reviewer && (
+      {!me.policyRequired && !me.reviewer && !me.reviewLifecycle && (
         <AdminRecovery key={`recovery-${me.user.id}`} userId={me.user.id} />
       )}
       {!me.reviewer && (
         <>
-          <ChangeEmail
-            key={`email-${me.user.id}`}
-            userId={me.user.id}
-            email={me.user.email}
-          />
-          <DeleteAccount
-            key={me.user.id}
-            userId={me.user.id}
-            email={me.user.email}
-          />
+          {(!me.reviewLifecycle ||
+            me.reviewLifecycle.purpose === 'email-change') && (
+            <ChangeEmail
+              key={`email-${me.user.id}`}
+              userId={me.user.id}
+              email={me.user.email}
+              reviewNextEmail={me.reviewLifecycle?.nextEmail}
+            />
+          )}
+          {(!me.reviewLifecycle ||
+            me.reviewLifecycle.purpose === 'deletion') && (
+            <DeleteAccount
+              key={me.user.id}
+              userId={me.user.id}
+              email={me.user.email}
+              disposable={!!me.reviewLifecycle}
+            />
+          )}
         </>
       )}
       <ErrorMessage message={action.error ? messageOf(action.error) : ''} />
