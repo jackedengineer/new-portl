@@ -19,6 +19,7 @@ import {
   Label,
   Loading,
 } from '../../components/ui';
+import { Identity } from '../../components/identity';
 import { api, messageOf } from '../../lib/api';
 import { useLiveGate } from '../gate/live';
 import { notificationDestination } from './navigation';
@@ -147,11 +148,12 @@ export function NotificationInbox({ userId }: { userId: string }) {
       {items.map((item) => (
         <Card key={item.id}>
           <Badge>{item.readAt ? 'Read' : 'Unread'}</Badge>
-          <Label>{notificationCopy[item.type].title}</Label>
+          <Identity title={notificationCopy[item.type].title} icon="bell" />
           <Copy>{notificationCopy[item.type].body}</Copy>
           <Copy small>{new Date(item.createdAt).toLocaleString()}</Copy>
           <Button
             label="Open notification"
+            icon="arrow-right"
             variant="secondary"
             disabled={open.isPending}
             pending={open.isPending && open.variables === item.id}

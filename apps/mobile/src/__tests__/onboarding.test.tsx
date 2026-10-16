@@ -15,6 +15,7 @@ import { AdminInvitations } from '../features/onboarding/admin-invitations';
 
 const mockApi = jest.fn();
 const mockRefresh = jest.fn();
+const mockSignOut = jest.fn();
 const mockReplace = jest.fn();
 const mockVerify = jest.fn();
 const mockMe = {
@@ -23,7 +24,11 @@ const mockMe = {
   adminAuthenticatorConfigured: true,
 };
 jest.mock('../auth/session', () => ({
-  useSession: () => ({ me: mockMe, refresh: mockRefresh, signOut: jest.fn() }),
+  useSession: () => ({
+    me: mockMe,
+    refresh: mockRefresh,
+    signOut: mockSignOut,
+  }),
 }));
 jest.mock('../lib/api', () => ({
   api: (...args: unknown[]) => mockApi(...args),
@@ -309,4 +314,17 @@ it('lets an admin retry a failed page and invite a flat beyond the first 500', a
     expect.any(AbortSignal),
     'admin',
   );
+});
+
+it('shows a sign-out failure even if community access is collapsed', async () => {
+  mockApi.mockResolvedValue({ items: [], nextCursor: null });
+  mockSignOut.mockRejectedValueOnce(
+    new Error('Could not sign out. Try again.'),
+  );
+  renderWithQuery(<Community />);
+  fireEvent.press(
+    screen.getByRole('button', { name: 'Account & community access' }),
+  );
+  fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
+  await screen.findByText('Could not sign out. Try again.');
 });

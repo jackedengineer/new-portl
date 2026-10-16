@@ -48,7 +48,7 @@ beforeEach(() => {
 });
 it('requires explicit acceptance and shared-account acknowledgement, then verifies server identity', async () => {
   render(<Reviewer />);
-  fireEvent.press(screen.getByRole('button', { name: 'Security guard' }));
+  fireEvent.press(screen.getByRole('tab', { name: 'Security guard' }));
   fireEvent.changeText(
     screen.getByLabelText('Review access key'),
     'a'.repeat(43),

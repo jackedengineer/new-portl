@@ -10,6 +10,8 @@ import {
   Label,
   Row,
 } from '../../components/ui';
+import { Identity } from '../../components/identity';
+import { Segments } from '../../components/task-ui';
 import { messageOf } from '../../lib/api';
 import { useOperationCommand, useOperationList } from './request';
 import { ListState } from './list-state';
@@ -56,19 +58,19 @@ export function DirectoryBoard({
           variant="secondary"
           onPress={() => setSearch(input.trim())}
         />
-        {[
-          ['', 'All contacts'],
-          ['STAFF', 'Staff'],
-          ['SERVICE_PROVIDER', 'Service providers'],
-        ].map(([value, label]) => (
-          <Button
-            key={value}
-            label={label!}
-            variant={filter === value ? 'primary' : 'secondary'}
-            onPress={() => setFilter(value!)}
-          />
-        ))}
       </Row>
+      <Segments
+        label="Contact type"
+        options={
+          [
+            ['', 'All contacts'],
+            ['STAFF', 'Staff'],
+            ['SERVICE_PROVIDER', 'Service providers'],
+          ] as const
+        }
+        value={filter}
+        onChange={setFilter}
+      />
       {view === 'ADMIN' && (
         <Row>
           <Button
@@ -103,7 +105,10 @@ export function DirectoryBoard({
             {item.kind === 'STAFF' ? 'Society staff' : 'Service provider'}
             {item.archived ? ' · Archived' : ''}
           </Badge>
-          <Label>{item.name}</Label>
+          <Identity
+            title={item.name}
+            icon={item.kind === 'STAFF' ? 'user' : 'tool'}
+          />
           <Copy>{item.service}</Copy>
           {!!item.description && <Copy>{item.description}</Copy>}
           <Copy>{item.phone ?? 'No phone number shared'}</Copy>

@@ -1,4 +1,4 @@
-import { Redirect, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useLiveGate } from '../../features/gate/live';
 import { useSession } from '../../auth/session';
 import { Copy, Screen, Title } from '../../components/ui';
@@ -18,7 +18,6 @@ export default function Visitors() {
     return <AdminStepUp societyName={access.member.society.name} />;
   return (
     <Screen
-      back
       eyebrow={
         access.view === 'GUARD'
           ? 'Gate operations'
@@ -36,9 +35,18 @@ export default function Visitors() {
       </Title>
       <Copy>{access.member.society.name}</Copy>
       <VisitorQueue
+        key={`${me.user.id}:${access.member.society.id}:${access.view}:${params.filter ?? 'WAITING'}`}
         userId={me.user.id}
         societyId={access.member.society.id}
         view={access.view}
+        activeFilter={
+          params.filter === 'HISTORY' ||
+          params.filter === 'READY' ||
+          params.filter === 'INSIDE'
+            ? params.filter
+            : 'WAITING'
+        }
+        onFilterChange={(filter) => router.setParams({ filter })}
       />
     </Screen>
   );

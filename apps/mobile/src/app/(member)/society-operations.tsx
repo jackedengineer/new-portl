@@ -1,19 +1,25 @@
-import { useState } from 'react';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { idSchema } from '@portl/contracts';
 import { useSession } from '../../auth/session';
-import { Badge, Button, Copy, Row, Screen, Title } from '../../components/ui';
+import { Badge, Card, Screen, Title } from '../../components/ui';
+import { ActionRow, Segments } from '../../components/task-ui';
 import { AdminStepUp } from '../../features/onboarding/admin-step-up';
 import { SocietyOverview } from '../../features/administration/overview';
 import { SocietyStructure } from '../../features/administration/structure';
 import { SocietyResidents } from '../../features/administration/residents';
 import { DirectoryBoard } from '../../features/administration/directory';
 export default function SocietyOperations() {
-  const { societyId } = useLocalSearchParams<{ societyId: string }>(),
+  const { societyId, section } = useLocalSearchParams<{
+      societyId: string;
+      section?: string;
+    }>(),
     { me } = useSession();
-  const [tab, setTab] = useState<
-    'overview' | 'structure' | 'residents' | 'directory'
-  >('overview');
+  const tab =
+    section === 'structure' ||
+    section === 'residents' ||
+    section === 'directory'
+      ? section
+      : 'overview';
   const parsed = idSchema.safeParse(societyId),
     member = me?.memberships.find(
       (m) =>
@@ -26,49 +32,33 @@ export default function SocietyOperations() {
     return <AdminStepUp societyName={member.society.name} />;
   const props = { userId: me.user.id, societyId: member.society.id };
   return (
-    <Screen back eyebrow="Society administration">
+    <Screen eyebrow="Society administration">
       <Badge>
         {member.society.isDemo ? 'Demo society' : 'Admin access verified'}
       </Badge>
-      <Title>Manage your society.</Title>
-      <Copy>{member.society.name}</Copy>
-      <Row>
-        {(
-          [
-            ['overview', 'Overview'],
-            ['structure', 'Towers & flats'],
-            ['residents', 'Residents'],
-            ['directory', 'Directory'],
-          ] as const
-        ).map(([value, label]) => (
-          <Button
-            key={value}
-            label={label}
-            variant={tab === value ? 'primary' : 'secondary'}
-            onPress={() => setTab(value)}
-          />
-        ))}
-      </Row>
-      <Button
-        label="Applications, invitations & gate access"
-        variant="secondary"
-        onPress={() =>
-          router.push({
-            pathname: '/admin',
-            params: { societyId: member.society.id },
-          })
-        }
-      />
-      <Button
-        label="Manage society notices"
-        variant="secondary"
-        onPress={() =>
-          router.push({
-            pathname: '/notices',
-            params: { societyId: member.society.id, view: 'ADMIN' },
-          })
-        }
-      />
+      <Title>
+        {tab === 'overview'
+          ? 'Your society, at a glance.'
+          : 'Manage your society.'}
+      </Title>
+      {tab !== 'overview' && (
+        <Segments
+          label="Society sections"
+          options={
+            [
+              ['overview', 'Overview'],
+              ['structure', 'Towers & flats'],
+              ['residents', 'Residents'],
+              ['directory', 'Directory'],
+            ] as const
+          }
+          value={tab}
+          onChange={(value) => {
+            router.setParams({ section: value });
+          }}
+        />
+      )}
+
       {tab === 'overview' ? (
         <SocietyOverview
           key={`${me.user.id}:${member.society.id}:overview`}
@@ -91,6 +81,30 @@ export default function SocietyOperations() {
           view="ADMIN"
         />
       )}
+      <Card>
+        <ActionRow
+          icon="user-plus"
+          title="Applications, invitations & gate access"
+          detail="Help your community get settled"
+          onPress={() =>
+            router.push({
+              pathname: '/admin',
+              params: { societyId: member.society.id },
+            })
+          }
+        />
+        <ActionRow
+          icon="file-text"
+          title="Manage society notices"
+          detail="Keep everyone in the loop"
+          onPress={() =>
+            router.push({
+              pathname: '/notices',
+              params: { societyId: member.society.id, view: 'ADMIN' },
+            })
+          }
+        />
+      </Card>
     </Screen>
   );
 }

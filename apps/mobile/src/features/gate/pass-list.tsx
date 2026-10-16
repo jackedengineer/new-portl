@@ -9,6 +9,7 @@ import {
 import { api, ApiError, messageOf } from '../../lib/api';
 import { Button, Copy, ErrorMessage, Loading, Row } from '../../components/ui';
 import { gateKey, gatePath, useLiveGate } from './live';
+import { Segments } from '../../components/task-ui';
 import { PassCard } from './pass-card';
 export function PassList({
   userId,
@@ -71,28 +72,28 @@ export function PassList({
           }
         />
       )}
-      <Row>
-        {(['UPCOMING', 'INSIDE', 'HISTORY'] as const)
+      <Segments
+        label="Guest pass status"
+        options={(['UPCOMING', 'INSIDE', 'HISTORY'] as const)
           .filter((f) => view !== 'GUARD' || f !== 'UPCOMING')
-          .map((f) => (
-            <Button
-              key={f}
-              label={
+          .map(
+            (f) =>
+              [
+                f,
                 f === 'UPCOMING'
                   ? 'Upcoming'
                   : f === 'INSIDE'
                     ? 'Inside'
-                    : 'History'
-              }
-              variant={f === filter ? 'primary' : 'secondary'}
-              disabled={accessUnavailable}
-              onPress={() => {
-                setFilter(f);
-                setPages([undefined]);
-              }}
-            />
-          ))}
-      </Row>
+                    : 'History',
+              ] as const,
+          )}
+        value={filter}
+        disabled={accessUnavailable}
+        onChange={(f) => {
+          setFilter(f);
+          setPages([undefined]);
+        }}
+      />
       <Copy small>
         {!live.online
           ? 'You’re offline. Reconnect for current pass status.'

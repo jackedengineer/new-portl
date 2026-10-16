@@ -164,11 +164,13 @@ export function VisitDetail({
         <>
           <Button
             label="Approve visitor"
+            icon="check"
             disabled={disabled}
             onPress={() => setChoice('APPROVE')}
           />
           <Button
             label="Reject visitor"
+            icon="x"
             variant="secondary"
             disabled={disabled}
             onPress={() => setChoice('REJECT')}
@@ -248,6 +250,9 @@ export function VisitDetail({
             disabled={
               disabled ||
               ((choice === 'entry' || choice === 'exit') && !selectedGate)
+            }
+            variant={
+              choice === 'REJECT' || choice === 'cancel' ? 'danger' : 'primary'
             }
             onPress={confirm}
           />

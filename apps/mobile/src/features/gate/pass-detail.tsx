@@ -1,3 +1,5 @@
+import { StyleSheet, Text } from 'react-native';
+import { colors } from '../../components/theme';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Share } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -219,13 +221,18 @@ export function PassDetail({
           </Copy>
           {code && fresh ? (
             <>
-              <Label>{code.match(/.{4}/g)!.join('-')}</Label>
-              <Button label="Share guest pass" onPress={() => void share()} />
+              <Text style={s.code}>{code.match(/.{4}/g)!.join('-')}</Text>
+              <Button
+                label="Share guest pass"
+                icon="share-2"
+                onPress={() => void share()}
+              />
               <Button label="Hide code" variant="quiet" onPress={wipe} />
             </>
           ) : (
             <Button
               label="Show pass code"
+              icon="eye"
               pending={revealing}
               disabled={!fresh}
               onPress={() => void reveal()}
@@ -321,3 +328,14 @@ export function PassDetail({
     </>
   );
 }
+
+const s = StyleSheet.create({
+  code: {
+    color: colors.ink,
+    fontSize: 22,
+    lineHeight: 32,
+    letterSpacing: 2,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+});

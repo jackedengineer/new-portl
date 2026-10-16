@@ -523,3 +523,70 @@ it('hides cached queue cards after access is revoked', async () => {
   await screen.findByText('Access no longer available');
   expect(screen.queryByText('A Guest')).toBeNull();
 });
+
+it('uses the same resident queue for home and hides its cached summary after a read fails', async () => {
+  mockApi.mockResolvedValue({ items: [visitor], nextCursor: null });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <VisitorQueue
+        userId="u1"
+        societyId="s1"
+        view="RESIDENT"
+        presentation="summary"
+      />
+    </QueryClientProvider>,
+  );
+  await screen.findByText('A Guest is at the gate.');
+  expect(
+    screen.getByRole('button', { name: 'Review visitor request' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Approve visitor' })).toBeNull();
+  expect(mockApi.mock.calls[0][0]).toBe(
+    '/societies/s1/gate/requests?view=RESIDENT&filter=WAITING',
+  );
+  mockApi.mockRejectedValue(new Error('Access removed'));
+  await client.refetchQueries();
+  await screen.findByText('Access removed');
+  expect(screen.queryByText('A Guest is at the gate.')).toBeNull();
+  expect(
+    screen.queryByRole('button', { name: 'Review visitor request' }),
+  ).toBeNull();
+});
+
+it('keeps external History navigation and local queue filters synchronized', async () => {
+  mockApi.mockResolvedValue({ items: [], nextCursor: null });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  const change = jest.fn();
+  const queue = (filter: 'HISTORY' | 'WAITING') => (
+    <QueryClientProvider client={client}>
+      <VisitorQueue
+        userId="guard"
+        societyId="society"
+        view="GUARD"
+        activeFilter={filter}
+        onFilterChange={change}
+      />
+    </QueryClientProvider>
+  );
+  const view = render(queue('HISTORY'));
+  await screen.findByText('No past visits yet');
+  fireEvent.press(screen.getByRole('tab', { name: 'Waiting' }));
+  expect(change).toHaveBeenCalledWith('WAITING');
+  view.rerender(queue('WAITING'));
+  await screen.findByText('No visitors waiting');
+  expect(
+    screen.getByRole('tab', { name: 'Waiting', selected: true }),
+  ).toBeTruthy();
+  view.rerender(queue('HISTORY'));
+  await screen.findByText('No past visits yet');
+  expect(
+    mockApi.mock.calls.some((call) =>
+      call[0].endsWith('view=GUARD&filter=HISTORY'),
+    ),
+  ).toBe(true);
+});

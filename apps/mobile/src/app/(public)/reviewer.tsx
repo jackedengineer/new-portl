@@ -1,3 +1,4 @@
+import { Segments } from '../../components/task-ui';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { reviewerSignInInput } from '@portl/contracts';
@@ -71,25 +72,23 @@ export default function Reviewer() {
         entered accidentally. Push is optional and uses your real device
         registration if enabled.
       </Copy>
-      {(['RESIDENT', 'GUARD', 'ADMIN'] as const).map((value) => (
-        <Button
-          key={value}
-          label={
-            value === 'RESIDENT'
-              ? 'Resident'
-              : value === 'GUARD'
-                ? 'Security guard'
-                : 'Society admin'
-          }
-          variant={role === value ? 'primary' : 'secondary'}
-          disabled={pending}
-          onPress={() => {
-            setRole(value);
-            setKey('');
-            setError('');
-          }}
-        />
-      ))}
+      <Segments
+        label="Reviewer role"
+        options={
+          [
+            ['RESIDENT', 'Resident'],
+            ['GUARD', 'Security guard'],
+            ['ADMIN', 'Society admin'],
+          ] as const
+        }
+        value={role}
+        disabled={pending}
+        onChange={(value) => {
+          setRole(value);
+          setKey('');
+          setError('');
+        }}
+      />
       <Field
         label="Review access key"
         value={key}

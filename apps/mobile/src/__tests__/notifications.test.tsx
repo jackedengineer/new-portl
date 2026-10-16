@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationInbox } from '../features/notifications/inbox';
 import { notificationDestination } from '../features/notifications/navigation';
@@ -53,12 +58,12 @@ it('loads a private inbox and opens only the authorized, fresh destination', asy
   await screen.findByText('Visitor approval needed');
   expect(screen.getByText(/Push alerts need an installed/)).toBeTruthy();
   fireEvent.press(screen.getByRole('button', { name: 'Open notification' }));
-  await screen.findByText('Visitor approval needed');
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(mockPush).toHaveBeenCalledWith({
-    pathname: '/visitor',
-    params: { id: 'request', societyId: 'society', view: 'RESIDENT' },
-  });
+  await waitFor(() =>
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/visitor',
+      params: { id: 'request', societyId: 'society', view: 'RESIDENT' },
+    }),
+  );
   mounted.unmount();
   client.clear();
 });

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { GuestPass } from '@portl/contracts';
-import { Badge, Card, Copy, Label } from '../../components/ui';
+import { Badge, Card, Copy } from '../../components/ui';
+import { Identity } from '../../components/identity';
 import { istLabel } from './pass-time';
 const statuses: Record<GuestPass['status'], string> = {
   SCHEDULED: 'Scheduled',
@@ -21,7 +22,7 @@ export function PassCard({
   return (
     <Card>
       <Badge>{statuses[pass.status]}</Badge>
-      <Label>{pass.visitorName}</Label>
+      <Identity title={pass.visitorName} icon="credit-card" />
       <Copy>
         {pass.flat.tower} · {pass.flat.label}
       </Copy>
