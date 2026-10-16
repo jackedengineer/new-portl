@@ -1,0 +1,31 @@
+{
+  "assetVersion": "1.0.0",
+  "createdOn": "2026-10-15",
+  "generator": "Built-in image generation",
+  "export": "Exact-size PNG exports of generated masters; no invented app UI",
+  "app": "Portl",
+  "assets": [
+    {
+      "file": "app-icon-512.png",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA",
+      "bitDepth": 8,
+      "pngColorType": 6,
+      "bytes": 198214,
+      "sha256": "8b5d4537e5983addc3ff10d923416836441975cc62122e28bb364e9716c8e70d",
+      "source": "exec-27a98996-5a23-4221-b9f4-1e6bdcd15994.png"
+    },
+    {
+      "file": "feature-graphic-1024x500.png",
+      "width": 1024,
+      "height": 500,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "pngColorType": 2,
+      "bytes": 386958,
+      "sha256": "f95a22e4b568d0756c92a38224c46e27c43b8b5b6d09caf28c5a185e9847f9a8",
+      "source": "exec-a91a34ef-7cc3-406e-93b9-e9004a73bc32.png"
+    }
+  ]
+}

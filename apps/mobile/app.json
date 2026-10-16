@@ -4,19 +4,18 @@
     "slug": "portl",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/portl-icon-v1.png",
     "scheme": "portl",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/portl-icon-v1.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#173D32",
+        "foregroundImage": "./assets/images/portl-adaptive-foreground-v1.png",
+        "monochromeImage": "./assets/images/portl-adaptive-monochrome-v1.png"
       },
       "predictiveBackGestureEnabled": false
     },
