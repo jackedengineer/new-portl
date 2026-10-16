@@ -4,7 +4,14 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionProvider, useSession } from '../auth/session';
-import { Button, Copy, ErrorMessage, Loading, Screen } from '../components/ui';
+import {
+  Button,
+  colors,
+  Copy,
+  ErrorMessage,
+  Loading,
+  Screen,
+} from '../components/ui';
 import { NavigationProvider } from '../components/navigation/provider';
 import { BottomNavigation } from '../components/navigation/bar';
 
@@ -31,7 +38,10 @@ function Routes() {
         <View style={{ flex: 1 }}>
           <Stack
             key={session.me?.user.id ?? 'signed-out'}
-            screenOptions={{ headerShown: false }}
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+            }}
           >
             <Stack.Screen name="index" />
             <Stack.Screen name="deletion-status" />

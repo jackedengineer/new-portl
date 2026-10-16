@@ -68,23 +68,35 @@ export function ActionTile({
   );
 }
 
-export function Segments<T extends string>({
+export function Segments<T extends string | number>({
   options,
   value,
   onChange,
+  disabled = false,
+  label = 'View options',
 }: {
+  disabled?: boolean;
+  label?: string;
   options: readonly (readonly [T, string])[];
   value: T;
   onChange: (value: T) => void;
 }) {
   return (
-    <View accessibilityRole="tablist" style={s.segments}>
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={label}
+      aria-label={label}
+      style={s.segments}
+    >
       {options.map(([key, label]) => (
         <Pressable
           key={key}
           accessibilityRole="tab"
           accessibilityLabel={label}
-          accessibilityState={{ selected: key === value }}
+          accessibilityState={{ selected: key === value, disabled }}
+          aria-selected={key === value}
+          aria-disabled={disabled}
+          disabled={disabled}
           onPress={() => onChange(key)}
           style={({ pressed }) => [
             s.segment,
@@ -115,7 +127,9 @@ export function Disclosure({
     <View style={s.disclosure}>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={title}
         accessibilityState={{ expanded: open }}
+        aria-expanded={open}
         onPress={() => setOpen(!open)}
         style={s.disclosureHeading}
       >

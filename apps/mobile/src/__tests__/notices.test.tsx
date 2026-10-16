@@ -91,7 +91,7 @@ it('offers admin creation and status filters', async () => {
     <NoticeBoard userId="admin" societyId="society" view="ADMIN" />,
   );
   await screen.findByText('No notices here yet.');
-  fireEvent.press(screen.getByRole('button', { name: 'Drafts' }));
+  fireEvent.press(screen.getByRole('tab', { name: 'Drafts' }));
   await waitFor(() =>
     expect(mockApi.mock.calls.some((c) => c[0].includes('status=DRAFT'))).toBe(
       true,

@@ -18,7 +18,7 @@ export function AppHeader({ back = false }: { back?: boolean }) {
   const nav = useCommunityNavigation();
   const [choosing, setChoosing] = useState(false);
   const context = nav?.visible ? nav.context : null;
-  const canChoose = !!nav?.memberships.length;
+  const canChoose = !!nav?.available && !!nav.memberships.length;
   return (
     <>
       <View style={s.header}>
@@ -47,7 +47,7 @@ export function AppHeader({ back = false }: { back?: boolean }) {
               </Text>
               <Text style={s.detail}>
                 {context
-                  ? `${roleLabels[context.role]}${context.role === 'RESIDENT' && context.member.flats.length ? ` · ${context.member.flats[0]!.tower}/${context.member.flats[0]!.label}` : ''}`
+                  ? `${roleLabels[context.role]}${context.role === 'RESIDENT' && context.member.flats.length ? (context.member.flats.length === 1 ? ` · ${context.member.flats[0]!.tower}/${context.member.flats[0]!.label}` : ` · ${context.member.flats.length} homes`) : ''}`
                   : 'Your societies and authorized roles'}
               </Text>
             </View>
@@ -79,7 +79,11 @@ export function AppHeader({ back = false }: { back?: boolean }) {
         onRequestClose={() => setChoosing(false)}
       >
         <View style={s.backdrop}>
-          <SafeAreaView edges={['bottom']} style={s.sheet}>
+          <SafeAreaView
+            edges={['bottom']}
+            style={s.sheet}
+            accessibilityViewIsModal
+          >
             <Text accessibilityRole="header" style={s.title}>
               Your communities
             </Text>

@@ -50,21 +50,28 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     userId = me?.user.id;
   if (selected && selected.userId !== me?.user.id) setSelected(undefined);
   // Remember a validated route context before rendering a destination without society params.
-  if (params.societyId && societyId && role && userId &&
-    (selected?.societyId !== societyId || selected.role !== role || selected.userId !== userId)) {
+  if (
+    params.societyId &&
+    societyId &&
+    role &&
+    userId &&
+    (selected?.societyId !== societyId ||
+      selected.role !== role ||
+      selected.userId !== userId)
+  ) {
     setSelected({ societyId, role, userId });
   }
-  const visible =
-    !!context &&
+  const available =
     !!me &&
     !me.policyRequired &&
     !me.reviewLifecycle &&
     !session.loading &&
-    !session.error &&
-    !standalone.has(pathname);
+    !session.error;
+  const visible = available && !!context && !standalone.has(pathname);
   function select(selection: Selection) {
     if (
       !me ||
+      !available ||
       !resolveContext(memberships, {
         societyId: selection.societyId,
         view: selection.role,
@@ -84,7 +91,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }
   return (
     <NavigationContext.Provider
-      value={{ context, memberships, visible, pathname, params, select }}
+      value={{
+        context,
+        memberships,
+        available,
+        visible,
+        pathname,
+        params,
+        select,
+      }}
     >
       {children}
     </NavigationContext.Provider>

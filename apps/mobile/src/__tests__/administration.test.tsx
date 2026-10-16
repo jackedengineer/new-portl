@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SocietyOverview } from '../features/administration/overview';
 import { DirectoryBoard } from '../features/administration/directory';
 import { DirectoryEditor } from '../features/administration/directory-editor';
 import { SocietyResidents } from '../features/administration/residents';
@@ -17,7 +18,11 @@ jest.mock('../lib/api', () => ({
   messageOf: (e: Error) => e.message,
   successSchema: {},
 }));
-jest.mock('expo-router', () => ({ useIsFocused: () => true }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useIsFocused: () => true,
+  router: { push: (...args: unknown[]) => mockPush(...args) },
+}));
 jest.mock('../features/gate/live', () => ({
   useLiveGate: () => ({
     enabled: false,
@@ -221,6 +226,33 @@ it('validates a tower form and uses a stable creation identifier', async () => {
       name: 'North',
     }),
   );
+  v.unmount();
+  v.client.clear();
+});
+
+it('surfaces the existing pending-application count and routes review to the same society', async () => {
+  mockApi.mockResolvedValue({
+    towers: 3,
+    flats: 48,
+    residents: 84,
+    pendingApplications: 2,
+    gates: 2,
+    guards: 4,
+    staff: 6,
+    serviceProviders: 8,
+  });
+  const v = show(<SocietyOverview userId="admin" societyId="society" />);
+  await screen.findByText('2 applications awaiting review.');
+  expect(mockApi.mock.calls[0][0]).toBe(
+    '/societies/society/administration/summary',
+  );
+  expect(mockApi.mock.calls[0][4]).toBe('admin');
+  fireEvent.press(screen.getByRole('button', { name: 'Review applications' }));
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/admin',
+    params: { societyId: 'society' },
+  });
+  expect(mockApi.mock.calls.some((call) => call[2] !== undefined)).toBe(false);
   v.unmount();
   v.client.clear();
 });

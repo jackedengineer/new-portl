@@ -18,6 +18,8 @@ import {
 import { gateKey, gatePath, useLiveGate } from './live';
 import { useGateSocket } from './socket';
 import { VisitorCard } from './visitor-card';
+import { QueueSummary } from './queue-summary';
+import { Segments } from '../../components/task-ui';
 const filters: Record<GateFilter, string> = {
   WAITING: 'Waiting',
   READY: 'Ready',
@@ -28,14 +30,21 @@ export function VisitorQueue({
   userId,
   societyId,
   view,
+  activeFilter,
+  onFilterChange,
+  presentation = 'full',
 }: {
   userId: string;
   societyId: string;
   view: GateView;
+  activeFilter?: GateFilter;
+  onFilterChange?: (filter: GateFilter) => void;
+  presentation?: 'full' | 'summary';
 }) {
   const live = useLiveGate();
   const connected = useGateSocket(userId, societyId, view, live.enabled);
-  const [filter, setFilter] = useState<GateFilter>('WAITING');
+  const [selectedFilter, setFilter] = useState<GateFilter>('WAITING');
+  const filter = activeFilter ?? selectedFilter;
   const [pages, setPages] = useState<(string | undefined)[]>([undefined]);
   const cursor = pages.at(-1);
   const query = useQuery({
@@ -55,11 +64,35 @@ export function VisitorQueue({
     refetchInterval: 5000,
     staleTime: 0,
   });
+  if (presentation === 'summary')
+    return (
+      <>
+        {query.isPending && <Loading label="Checking the gate…" />}
+        <ErrorMessage message={query.error ? messageOf(query.error) : null} />
+        {!query.isPending && !query.error && (
+          <QueueSummary items={query.data?.items ?? []} societyId={societyId} />
+        )}
+        {!live.online && (
+          <Copy small>
+            You’re offline. Reconnect to get current gate status.
+          </Copy>
+        )}
+        {query.error && (
+          <Button
+            label="Retry visitors"
+            variant="secondary"
+            pending={query.isFetching}
+            onPress={() => void query.refetch()}
+          />
+        )}
+      </>
+    );
   return (
     <>
       {view === 'GUARD' && (
         <Button
           label="Register visitor"
+          icon="user-plus"
           onPress={() =>
             router.push({
               pathname: '/register-visitor',
@@ -70,6 +103,7 @@ export function VisitorQueue({
       )}
       <Button
         label="Guest passes"
+        icon="credit-card"
         variant="secondary"
         onPress={() =>
           router.push({
@@ -81,6 +115,7 @@ export function VisitorQueue({
       {view === 'GUARD' && (
         <Button
           label="Verify guest pass"
+          icon="check-circle"
           variant="secondary"
           onPress={() =>
             router.push({
@@ -90,19 +125,18 @@ export function VisitorQueue({
           }
         />
       )}
-      <Row>
-        {(Object.keys(filters) as GateFilter[]).map((key) => (
-          <Button
-            key={key}
-            label={filters[key]}
-            variant={key === filter ? 'primary' : 'secondary'}
-            onPress={() => {
-              setFilter(key);
-              setPages([undefined]);
-            }}
-          />
-        ))}
-      </Row>
+      <Segments
+        label="Visitor status"
+        options={(Object.keys(filters) as GateFilter[]).map(
+          (key) => [key, filters[key]] as const,
+        )}
+        value={filter}
+        onChange={(key) => {
+          setFilter(key);
+          onFilterChange?.(key);
+          setPages([undefined]);
+        }}
+      />
       <Copy small>
         {!live.online
           ? 'You’re offline. Reconnect to get current gate status.'

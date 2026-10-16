@@ -117,7 +117,7 @@ export default function Login() {
 }
 const s = StyleSheet.create({
   scene: {
-    height: 196,
+    height: 152,
     backgroundColor: '#E8EDE5',
     borderRadius: 20,
     overflow: 'hidden',
@@ -128,12 +128,12 @@ const s = StyleSheet.create({
     left: 48,
     bottom: 40,
     width: 120,
-    height: 140,
+    height: 104,
     backgroundColor: '#C9D4C7',
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
   },
-  windows: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 20 },
+  windows: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 16 },
   window: { width: 18, height: 20, backgroundColor: colors.ink },
   door: {
     position: 'absolute',
@@ -159,7 +159,7 @@ const s = StyleSheet.create({
     right: 24,
     bottom: 40,
     width: 40,
-    height: 88,
+    height: 76,
     borderRadius: 24,
     backgroundColor: '#879D81',
   },

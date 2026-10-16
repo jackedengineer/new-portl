@@ -19,6 +19,8 @@ export function Icon({
       size={size}
       color={color}
       accessible={false}
+      accessibilityElementsHidden
+      aria-hidden
       importantForAccessibility="no-hide-descendants"
     />
   );

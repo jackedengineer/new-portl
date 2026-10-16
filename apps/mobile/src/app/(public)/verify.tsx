@@ -1,3 +1,4 @@
+import { StyleSheet } from 'react-native';
 import { policyAcceptance } from '../../features/account/policy';
 import { useEffect, useState } from 'react';
 import { Redirect, router } from 'expo-router';
@@ -90,6 +91,7 @@ export default function Verify() {
       </Copy>
       <Field
         label="Six-digit email code"
+        style={s.code}
         value={code}
         onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
         keyboardType="number-pad"
@@ -128,3 +130,13 @@ export default function Verify() {
     </Screen>
   );
 }
+
+const s = StyleSheet.create({
+  code: {
+    fontSize: 26,
+    letterSpacing: 8,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+    paddingVertical: 18,
+  },
+});

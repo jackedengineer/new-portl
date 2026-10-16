@@ -26,9 +26,8 @@ export function resolveContext(
     if (!member) return null;
     const matchingRole =
       role ?? (member.roles.length === 1 ? member.roles[0] : undefined);
-    return member.roles.some((r) => r === matchingRole)
-      ? { member, role: matchingRole as GateView }
-      : null;
+    const authorizedRole = member.roles.find((r) => r === matchingRole);
+    return authorizedRole ? { member, role: authorizedRole } : null;
   }
   return memberships.length === 1 && memberships[0]!.roles.length === 1
     ? { member: memberships[0]!, role: memberships[0]!.roles[0]! }
@@ -112,8 +111,9 @@ export function activeNavigationLabel(
   )
     return 'Notices';
   if (role === 'ADMIN')
-    return pathname === '/society-operations' &&
-      (!params.section || params.section === 'overview')
+    return pathname === '/community' ||
+      (pathname === '/society-operations' &&
+        (!params.section || params.section === 'overview'))
       ? 'Overview'
       : 'Society';
   if (role === 'GUARD') {

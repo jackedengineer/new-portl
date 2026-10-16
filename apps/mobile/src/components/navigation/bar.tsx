@@ -26,7 +26,12 @@ export function BottomNavigation() {
   const { member, role } = nav.context;
   return (
     <SafeAreaView edges={['bottom']} style={s.safe}>
-      <View accessibilityRole="tablist" style={s.tabs}>
+      <View
+        accessibilityRole="tablist"
+        accessibilityLabel="Main navigation"
+        aria-label="Main navigation"
+        style={s.tabs}
+      >
         {navigationItems(role).map((item) => {
           const active =
             activeNavigationLabel(role, nav.pathname, nav.params) ===
@@ -37,6 +42,7 @@ export function BottomNavigation() {
               accessibilityRole="tab"
               accessibilityLabel={item.label}
               accessibilityState={{ selected: active }}
+              aria-selected={active}
               style={({ pressed }) => [s.tab, pressed && s.pressed]}
               onPress={() =>
                 router.replace({

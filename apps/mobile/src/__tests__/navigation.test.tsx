@@ -2,6 +2,7 @@ import { Text } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { NavigationProvider } from '../components/navigation/provider';
 import { useCommunityNavigation } from '../components/navigation/context';
+import { AppHeader } from '../components/navigation/header';
 import { BottomNavigation } from '../components/navigation/bar';
 import type { Me } from '@portl/contracts';
 const mockReplace = jest.fn();
@@ -123,4 +124,29 @@ it('forgets a role choice after sign-out, even when the same account signs in ag
   view.rerender(<App />);
   expect(screen.getByText('Choose community')).toBeTruthy();
   expect(screen.queryByRole('tab')).toBeNull();
+});
+
+it('shows only current memberships and roles in the actual society chooser', () => {
+  render(
+    <NavigationProvider>
+      <AppHeader />
+    </NavigationProvider>,
+  );
+  fireEvent.press(
+    screen.getByRole('button', { name: 'Choose society and role' }),
+  );
+  expect(
+    screen.getByRole('button', { name: 'Gardens, Resident' }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole('button', { name: 'Gardens, Security guard' }),
+  ).toBeTruthy();
+  expect(
+    screen.queryByRole('button', { name: 'Gardens, Society admin' }),
+  ).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Gardens, Resident' }));
+  expect(mockReplace).toHaveBeenCalledWith({
+    pathname: '/community',
+    params: { societyId: 'a', view: 'RESIDENT' },
+  });
 });

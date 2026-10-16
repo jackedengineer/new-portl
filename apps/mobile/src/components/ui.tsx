@@ -161,6 +161,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: disabled || pending, busy: pending }}
       disabled={disabled || pending}
       onPress={onPress}
@@ -234,6 +235,7 @@ export function Choice({
     <Pressable
       accessibilityRole={role}
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={label}
       onPress={onPress}
       style={[s.choice, selected && s.choiceActive]}

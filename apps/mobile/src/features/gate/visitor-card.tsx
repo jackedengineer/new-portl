@@ -1,5 +1,6 @@
 import type { VisitorRequest } from '@portl/contracts';
-import { Badge, Card, Copy, Label } from '../../components/ui';
+import { Badge, Card, Copy } from '../../components/ui';
+import { Identity } from '../../components/identity';
 export const categoryLabel = {
   GUEST: 'Guest',
   DELIVERY: 'Delivery',
@@ -23,14 +24,33 @@ export function VisitorCard({
 }) {
   return (
     <Card>
-      <Badge>
+      <Badge
+        tone={
+          r.status === 'PENDING'
+            ? 'warning'
+            : r.status === 'REJECTED'
+              ? 'danger'
+              : 'neutral'
+        }
+      >
         {r.presence === 'INSIDE'
           ? 'Inside society'
           : r.presence === 'EXITED'
             ? 'Visit completed'
             : labels[r.status]}
       </Badge>
-      <Label>{r.visitorName}</Label>
+      <Identity
+        title={r.visitorName}
+        icon={
+          r.category === 'DELIVERY'
+            ? 'package'
+            : r.category === 'CAB'
+              ? 'truck'
+              : r.category === 'SERVICE'
+                ? 'tool'
+                : 'user'
+        }
+      />
       <Copy>
         {categoryLabel[r.category]}
         {r.company ? ` · ${r.company}` : ''}

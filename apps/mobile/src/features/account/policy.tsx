@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { openURL } from 'expo-linking';
 import { POLICY_VERSION } from '@portl/contracts';
 import { apiURL } from '../../lib/auth-client';
-import { Button, Choice, Copy, ErrorMessage } from '../../components/ui';
+import { Button, Choice, Copy, ErrorMessage, Row } from '../../components/ui';
 export const policyAcceptance = {
   adult: true as const,
   termsVersion: POLICY_VERSION,
@@ -12,25 +12,27 @@ export function LegalLinks() {
   const [error, setError] = useState('');
   return (
     <>
-      {(['privacy', 'terms', 'support'] as const).map((path) => (
-        <Button
-          key={path}
-          label={
-            path === 'privacy'
-              ? 'Privacy notice'
-              : path === 'terms'
-                ? 'Terms of use'
-                : 'Support'
-          }
-          variant="quiet"
-          onPress={() => {
-            setError('');
-            void openURL(`${apiURL}/${path}`).catch(() =>
-              setError('Could not open this page. Check your connection.'),
-            );
-          }}
-        />
-      ))}
+      <Row>
+        {(['privacy', 'terms', 'support'] as const).map((path) => (
+          <Button
+            key={path}
+            label={
+              path === 'privacy'
+                ? 'Privacy notice'
+                : path === 'terms'
+                  ? 'Terms of use'
+                  : 'Support'
+            }
+            variant="quiet"
+            onPress={() => {
+              setError('');
+              void openURL(`${apiURL}/${path}`).catch(() =>
+                setError('Could not open this page. Check your connection.'),
+              );
+            }}
+          />
+        ))}
+      </Row>
       <ErrorMessage message={error} />
     </>
   );

@@ -1,3 +1,4 @@
+import { CommunityMenu } from '../features/community/more-menu';
 import { StartReviewLifecycle } from '../features/account/review-lifecycle';
 import { AdminRecovery } from '../features/account/recovery';
 import { ChangeEmail } from '../features/account/email-change';
@@ -47,6 +48,7 @@ export default function Account() {
     <Screen back eyebrow="Your account">
       <Title>Account &amp; privacy</Title>
       <Copy>{me.user.email}</Copy>
+      {!me.policyRequired && !me.reviewLifecycle && <CommunityMenu />}
       {me.reviewer && (
         <Card>
           <Label>Shared fictional reviewer account</Label>

@@ -1,3 +1,4 @@
+import { Segments } from '../../components/task-ui';
 import { useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
@@ -17,7 +18,6 @@ import {
   Field,
   Label,
   Loading,
-  Row,
 } from '../../components/ui';
 import { gateKey, gatePath, useLiveGate } from './live';
 import { istFields, istWindow } from './pass-time';
@@ -151,17 +151,15 @@ export function PassCreate({
         onPress={() => setStart(istFields(Date.now()))}
       />
       <Label>Valid for</Label>
-      <Row>
-        {[15, 60, 240, 480, 1440].map((m) => (
-          <Button
-            key={m}
-            label={m < 60 ? '15 min' : `${m / 60} hr`}
-            variant={minutes === m ? 'primary' : 'secondary'}
-            disabled={locked}
-            onPress={() => setMinutes(m)}
-          />
-        ))}
-      </Row>
+      <Segments
+        label="Pass duration"
+        options={[15, 60, 240, 480, 1440].map(
+          (m) => [m, m < 60 ? '15 min' : `${m / 60} hr`] as const,
+        )}
+        value={minutes}
+        disabled={locked}
+        onChange={setMinutes}
+      />
       <Copy small>
         Schedule up to 7 days ahead. Each pass allows one entry and one exit.
         You can revoke it before entry.

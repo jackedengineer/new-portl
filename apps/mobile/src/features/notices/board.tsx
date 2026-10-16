@@ -10,8 +10,8 @@ import {
   ErrorMessage,
   Label,
   Loading,
-  Row,
 } from '../../components/ui';
+import { Segments } from '../../components/task-ui';
 import { messageOf } from '../../lib/api';
 import { useLiveGate } from '../gate/live';
 import { noticeKey, useNoticeRequest } from './request';
@@ -50,25 +50,24 @@ export function NoticeBoard({
         <>
           <Button
             label="Create notice"
+            icon="plus"
             onPress={() =>
               router.push({ pathname: '/notice-editor', params: { societyId } })
             }
           />
-          <Row>
-            {[
-              ['', 'All'],
-              ['DRAFT', 'Drafts'],
-              ['PUBLISHED', 'Published'],
-              ['ARCHIVED', 'Archived'],
-            ].map(([value, label]) => (
-              <Button
-                key={value}
-                label={label!}
-                variant={status === value ? 'primary' : 'secondary'}
-                onPress={() => setStatus(value!)}
-              />
-            ))}
-          </Row>
+          <Segments
+            label="Notice status"
+            options={
+              [
+                ['', 'All'],
+                ['DRAFT', 'Drafts'],
+                ['PUBLISHED', 'Published'],
+                ['ARCHIVED', 'Archived'],
+              ] as const
+            }
+            value={status}
+            onChange={setStatus}
+          />
         </>
       )}
       {list.isPending && <Loading label="Loading society notices…" />}
@@ -92,7 +91,8 @@ export function NoticeBoard({
           </Copy>
           <Button
             label={view === 'ADMIN' ? 'Manage notice' : 'Read notice'}
-            variant="secondary"
+            icon="arrow-right"
+            variant="quiet"
             onPress={() =>
               router.push({
                 pathname: '/notice',

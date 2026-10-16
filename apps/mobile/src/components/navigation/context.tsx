@@ -5,6 +5,7 @@ import type { CommunityContext } from './model';
 type NavigationState = {
   context: CommunityContext | null;
   memberships: Me['memberships'];
+  available: boolean;
   visible: boolean;
   pathname: string;
   params: { filter?: string; section?: string };

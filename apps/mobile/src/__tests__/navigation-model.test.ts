@@ -82,7 +82,13 @@ it('keeps nested routes in their role-specific navigation section', () => {
   expect(activeNavigationLabel('RESIDENT', '/visitor', {})).toBe('Gate');
   expect(activeNavigationLabel('RESIDENT', '/guest-pass', {})).toBe('Gate');
   expect(activeNavigationLabel('GUARD', '/guest-pass', {})).toBe('Passes');
-  expect(activeNavigationLabel('GUARD', '/visitors', { filter: 'HISTORY' })).toBe('History');
-  expect(activeNavigationLabel('ADMIN', '/society-operations', { section: 'residents' })).toBe('Society');
+  expect(
+    activeNavigationLabel('GUARD', '/visitors', { filter: 'HISTORY' }),
+  ).toBe('History');
+  expect(
+    activeNavigationLabel('ADMIN', '/society-operations', {
+      section: 'residents',
+    }),
+  ).toBe('Society');
   expect(activeNavigationLabel('ADMIN', '/notice-editor', {})).toBe('Notices');
 });
