@@ -5,6 +5,8 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionProvider, useSession } from '../auth/session';
 import { Button, Copy, ErrorMessage, Loading, Screen } from '../components/ui';
+import { NavigationProvider } from '../components/navigation/provider';
+import { BottomNavigation } from '../components/navigation/bar';
 
 function Routes() {
   const session = useSession();
@@ -26,28 +28,31 @@ function Routes() {
         accessibilityElementsHidden={blocked}
         importantForAccessibility={blocked ? 'no-hide-descendants' : 'auto'}
       >
-        <Stack
-          key={session.me?.user.id ?? 'signed-out'}
-          screenOptions={{ headerShown: false }}
-        >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="deletion-status" />
-          <Stack.Protected guard={!session.me}>
-            <Stack.Screen name="(public)" />
-          </Stack.Protected>
-          <Stack.Protected guard={!!session.me}>
-            <Stack.Screen name="account" />
-          </Stack.Protected>
-          <Stack.Protected
-            guard={
-              !!session.me &&
-              !session.me.policyRequired &&
-              !session.me.reviewLifecycle
-            }
+        <View style={{ flex: 1 }}>
+          <Stack
+            key={session.me?.user.id ?? 'signed-out'}
+            screenOptions={{ headerShown: false }}
           >
-            <Stack.Screen name="(member)" />
-          </Stack.Protected>
-        </Stack>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="deletion-status" />
+            <Stack.Protected guard={!session.me}>
+              <Stack.Screen name="(public)" />
+            </Stack.Protected>
+            <Stack.Protected guard={!!session.me}>
+              <Stack.Screen name="account" />
+            </Stack.Protected>
+            <Stack.Protected
+              guard={
+                !!session.me &&
+                !session.me.policyRequired &&
+                !session.me.reviewLifecycle
+              }
+            >
+              <Stack.Screen name="(member)" />
+            </Stack.Protected>
+          </Stack>
+        </View>
+        <BottomNavigation />
       </View>
       {session.loading ? <Loading /> : session.error ? retry : null}
     </View>
@@ -58,8 +63,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <SessionProvider>
-        <NotificationBridge />
-        <Routes />
+        <NavigationProvider>
+          <NotificationBridge />
+          <Routes />
+        </NavigationProvider>
       </SessionProvider>
     </SafeAreaProvider>
   );

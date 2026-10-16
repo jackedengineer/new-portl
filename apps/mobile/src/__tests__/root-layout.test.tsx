@@ -86,6 +86,13 @@ jest.mock('../auth/session', () => ({
 jest.mock('../features/notifications/bridge', () => ({
   NotificationBridge: () => null,
 }));
+jest.mock('../components/navigation/provider', () => ({
+  NavigationProvider: ({ children }: { children: ReactNode }) => children,
+  useCommunityNavigation: () => null,
+}));
+jest.mock('../components/navigation/bar', () => ({
+  BottomNavigation: () => null,
+}));
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 jest.mock(
   'react-native-safe-area-context',

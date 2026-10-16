@@ -1,5 +1,9 @@
 import type { Me } from '@portl/contracts';
-import { resolveContext, navigationItems } from '../components/navigation/model';
+import {
+  activeNavigationLabel,
+  resolveContext,
+  navigationItems,
+} from '../components/navigation/model';
 
 const resident = {
   society: { id: 'society-a', name: 'Gardens', isDemo: true },
@@ -12,27 +16,73 @@ const admin = {
   flats: [],
 } as Me['memberships'][number];
 it('uses the only membership automatically, but asks for context when several exist', () => {
-  expect(resolveContext([resident], {})).toEqual({ member: resident, role: 'RESIDENT' });
+  expect(resolveContext([resident], {})).toEqual({
+    member: resident,
+    role: 'RESIDENT',
+  });
   expect(resolveContext([resident, admin], {})).toBeNull();
 });
 it('does not carry a removed role or an invalid deep-link context into the navigation', () => {
-  expect(resolveContext([resident], { societyId: 'society-a', view: 'ADMIN' })).toBeNull();
-  expect(resolveContext([resident], { societyId: 'missing', view: 'RESIDENT' })).toBeNull();
-  expect(resolveContext([resident], {}, { societyId: 'society-a', role: 'ADMIN' })).toBeNull();
+  expect(
+    resolveContext([resident], { societyId: 'society-a', view: 'ADMIN' }),
+  ).toBeNull();
+  expect(
+    resolveContext([resident], { societyId: 'missing', view: 'RESIDENT' }),
+  ).toBeNull();
+  expect(
+    resolveContext([resident], {}, { societyId: 'society-a', role: 'ADMIN' }),
+  ).toBeNull();
 });
 it('follows a valid deep link rather than the previously selected society', () => {
-  expect(resolveContext([resident, admin], { societyId: 'society-b', view: 'ADMIN' }, { societyId: 'society-a', role: 'RESIDENT' })).toEqual({ member: admin, role: 'ADMIN' });
+  expect(
+    resolveContext(
+      [resident, admin],
+      { societyId: 'society-b', view: 'ADMIN' },
+      { societyId: 'society-a', role: 'RESIDENT' },
+    ),
+  ).toEqual({ member: admin, role: 'ADMIN' });
 });
 it('keeps a multi-role membership selectable without inventing a default role', () => {
   const member = { ...resident, roles: ['RESIDENT', 'GUARD'] as const };
-  expect(resolveContext([{ ...member, roles: [...member.roles] }], {})).toBeNull();
-  expect(resolveContext([{ ...member, roles: [...member.roles] }], { societyId: member.society.id, view: 'GUARD' })?.role).toBe('GUARD');
+  expect(
+    resolveContext([{ ...member, roles: [...member.roles] }], {}),
+  ).toBeNull();
+  expect(
+    resolveContext([{ ...member, roles: [...member.roles] }], {
+      societyId: member.society.id,
+      view: 'GUARD',
+    })?.role,
+  ).toBe('GUARD');
 });
 it('routes every role to its own existing screens and keeps guard history explicit', () => {
-  expect(navigationItems('RESIDENT').map(i=>i.label)).toEqual(['Home','Gate','Notices','More']);
-  expect(navigationItems('ADMIN').map(i=>i.label)).toEqual(['Overview','Society','Notices','More']);
+  expect(navigationItems('RESIDENT').map((i) => i.label)).toEqual([
+    'Home',
+    'Gate',
+    'Notices',
+    'More',
+  ]);
+  expect(navigationItems('ADMIN').map((i) => i.label)).toEqual([
+    'Overview',
+    'Society',
+    'Notices',
+    'More',
+  ]);
   const guard = navigationItems('GUARD');
-  expect(guard.map(i=>i.label)).toEqual(['Gate','Passes','History','Account']);
+  expect(guard.map((i) => i.label)).toEqual([
+    'Gate',
+    'Passes',
+    'History',
+    'Account',
+  ]);
   expect(guard[2]).toMatchObject({ pathname: '/visitors', filter: 'HISTORY' });
-  expect(guard.map(i=>i.pathname)).not.toContain('/directory');
+  expect(guard.map((i) => i.pathname)).not.toContain('/directory');
+});
+
+it('keeps nested routes in their role-specific navigation section', () => {
+  expect(activeNavigationLabel('RESIDENT', '/visitor', {})).toBe('Gate');
+  expect(activeNavigationLabel('RESIDENT', '/guest-pass', {})).toBe('Gate');
+  expect(activeNavigationLabel('GUARD', '/guest-pass', {})).toBe('Passes');
+  expect(activeNavigationLabel('GUARD', '/visitors', { filter: 'HISTORY' })).toBe('History');
+  expect(activeNavigationLabel('ADMIN', '/society-operations', { section: 'residents' })).toBe('Society');
+  expect(activeNavigationLabel('ADMIN', '/notice-editor', {})).toBe('Notices');
 });

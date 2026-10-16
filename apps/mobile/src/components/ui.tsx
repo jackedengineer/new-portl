@@ -12,18 +12,12 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { colors, radii, spacing } from './theme';
+import { Icon, type IconName } from './icon';
+import { AppHeader } from './navigation/header';
+import { useCommunityNavigation } from './navigation/context';
 
-export const colors = {
-  background: '#F6F5F0',
-  surface: '#FFFFFF',
-  ink: '#173D32',
-  muted: '#53665E',
-  line: '#D9DFD7',
-  accent: '#B74928',
-  soft: '#E8EDE5',
-  error: '#A62F24',
-};
+export { colors } from './theme';
 export function Screen({
   children,
   back = false,
@@ -33,8 +27,12 @@ export function Screen({
   back?: boolean;
   eyebrow?: string;
 }) {
+  const navigation = useCommunityNavigation();
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView
+      style={s.safe}
+      edges={navigation?.visible ? ['top', 'left', 'right'] : undefined}
+    >
       <KeyboardAvoidingView
         style={s.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -44,20 +42,7 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
         >
-          <View style={s.top}>
-            <Text style={s.wordmark}>
-              portl<Text style={s.dot}>.</Text>
-            </Text>
-            {back && (
-              <Button
-                label="Back"
-                variant="quiet"
-                onPress={() =>
-                  router.canGoBack() ? router.back() : router.replace('/')
-                }
-              />
-            )}
-          </View>
+          <AppHeader back={back} />
           {eyebrow && <Text style={s.eyebrow}>{eyebrow}</Text>}
           {children}
         </ScrollView>
@@ -81,8 +66,16 @@ export function Copy({
 }) {
   return <Text style={[s.copy, small && s.small]}>{children}</Text>;
 }
-export function Card({ children }: { children: ReactNode }) {
-  return <View style={s.card}>{children}</View>;
+export function Card({
+  children,
+  tone = 'surface',
+}: {
+  children: ReactNode;
+  tone?: 'surface' | 'soft';
+}) {
+  return (
+    <View style={[s.card, tone === 'soft' && s.softCard]}>{children}</View>
+  );
 }
 export function Row({ children }: { children: ReactNode }) {
   return <View style={s.row}>{children}</View>;
@@ -90,10 +83,30 @@ export function Row({ children }: { children: ReactNode }) {
 export function Label({ children }: { children: ReactNode }) {
   return <Text style={s.label}>{children}</Text>;
 }
-export function Badge({ children }: { children: ReactNode }) {
+export function Badge({
+  children,
+  tone = 'neutral',
+}: {
+  children: ReactNode;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger';
+}) {
   return (
-    <View style={s.badge}>
-      <Text style={s.badgeText}>{children}</Text>
+    <View
+      style={[
+        s.badge,
+        tone === 'warning' && s.warningBadge,
+        tone === 'danger' && s.dangerBadge,
+      ]}
+    >
+      <Text
+        style={[
+          s.badgeText,
+          tone === 'warning' && s.warningText,
+          tone === 'danger' && s.error,
+        ]}
+      >
+        {children}
+      </Text>
     </View>
   );
 }
@@ -103,6 +116,7 @@ export function Divider() {
 export function Field({
   label,
   error,
+  style,
   ...props
 }: TextInputProps & { label: string; error?: string }) {
   return (
@@ -111,7 +125,7 @@ export function Field({
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={colors.muted}
-        style={[s.input, error ? s.inputError : null]}
+        style={[s.input, error ? s.inputError : null, style]}
         {...props}
       />
       {error && <ErrorMessage message={error} />}
@@ -135,12 +149,14 @@ export function Button({
   pending = false,
   disabled = false,
   variant = 'primary',
+  icon,
 }: {
   label: string;
   onPress: () => void;
   pending?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'quiet';
+  variant?: 'primary' | 'secondary' | 'quiet' | 'danger';
+  icon?: IconName;
 }) {
   return (
     <Pressable
@@ -152,19 +168,40 @@ export function Button({
         s.button,
         variant === 'primary'
           ? s.primary
-          : variant === 'secondary'
-            ? s.secondary
-            : s.quiet,
+          : variant === 'danger'
+            ? s.danger
+            : variant === 'secondary'
+              ? s.secondary
+              : s.quiet,
         (disabled || pending) && s.disabled,
         pressed && s.pressed,
       ]}
     >
       {pending && (
         <ActivityIndicator
-          color={variant === 'primary' ? colors.surface : colors.ink}
+          color={
+            variant === 'primary' || variant === 'danger'
+              ? colors.surface
+              : colors.ink
+          }
         />
       )}
-      <Text style={[s.buttonText, variant === 'primary' && s.primaryText]}>
+      {!pending && icon && (
+        <Icon
+          name={icon}
+          color={
+            variant === 'primary' || variant === 'danger'
+              ? colors.surface
+              : colors.ink
+          }
+        />
+      )}
+      <Text
+        style={[
+          s.buttonText,
+          (variant === 'primary' || variant === 'danger') && s.primaryText,
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -201,10 +238,19 @@ export function Choice({
       onPress={onPress}
       style={[s.choice, selected && s.choiceActive]}
     >
-      <Text style={s.choiceText}>
-        {selected ? '●  ' : '○  '}
-        {label}
-      </Text>
+      <Icon
+        name={
+          role === 'checkbox'
+            ? selected
+              ? 'check-square'
+              : 'square'
+            : selected
+              ? 'check-circle'
+              : 'circle'
+        }
+        size={20}
+      />
+      <Text style={s.choiceText}>{label}</Text>
     </Pressable>
   );
 }
@@ -213,50 +259,38 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: {
     flexGrow: 1,
-    padding: 24,
-    gap: 20,
+    padding: spacing.xl,
+    gap: spacing.lg,
     width: '100%',
     maxWidth: 540,
     alignSelf: 'center',
     paddingBottom: 40,
   },
-  top: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  wordmark: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: -1.5,
-    color: colors.ink,
-  },
-  dot: { color: colors.accent },
   eyebrow: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
     color: colors.muted,
   },
   title: {
-    fontSize: 36,
-    lineHeight: 42,
-    fontWeight: '700',
-    letterSpacing: -1,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '600',
+    letterSpacing: -0.8,
     color: colors.ink,
   },
-  copy: { fontSize: 16, lineHeight: 25, color: colors.muted },
+  copy: { fontSize: 15, lineHeight: 23, color: colors.muted },
   small: { fontSize: 13, lineHeight: 20 },
   card: {
-    padding: 20,
-    gap: 14,
+    padding: spacing.lg,
+    gap: spacing.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 16,
+    borderRadius: radii.card,
   },
+  softCard: { backgroundColor: colors.soft, borderColor: colors.soft },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -266,20 +300,20 @@ const s = StyleSheet.create({
   label: { fontSize: 15, lineHeight: 22, fontWeight: '600', color: colors.ink },
   fieldGroup: { gap: 8 },
   input: {
-    minHeight: 54,
-    padding: 16,
+    minHeight: 50,
+    padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
+    borderRadius: radii.control,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 17,
+    fontSize: 16,
   },
   inputError: { borderColor: colors.error },
   error: { fontSize: 14, lineHeight: 21, color: colors.error },
   button: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: radii.control,
     paddingHorizontal: 18,
     paddingVertical: 14,
     alignItems: 'center',
@@ -288,13 +322,19 @@ const s = StyleSheet.create({
     gap: 10,
   },
   primary: { backgroundColor: colors.ink },
+  danger: { backgroundColor: colors.error },
   secondary: {
     backgroundColor: colors.soft,
-    borderWidth: 1,
-    borderColor: colors.line,
   },
   quiet: { paddingHorizontal: 4 },
-  buttonText: { fontSize: 15, fontWeight: '600', color: colors.ink },
+  buttonText: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
+    color: colors.ink,
+    flexShrink: 1,
+    textAlign: 'center',
+  },
   primaryText: { color: colors.surface },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.75 },
@@ -303,14 +343,16 @@ const s = StyleSheet.create({
     backgroundColor: colors.soft,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 7,
   },
+  warningBadge: { backgroundColor: colors.warningSurface },
+  dangerBadge: { backgroundColor: colors.errorSurface },
+  warningText: { color: colors.warning },
   badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0,
     color: colors.ink,
-    textTransform: 'uppercase',
   },
   divider: { height: 1, backgroundColor: colors.line },
   loading: {
@@ -324,11 +366,14 @@ const s = StyleSheet.create({
   choice: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: radii.control,
+    padding: spacing.md,
     minHeight: 52,
     backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   choiceActive: { borderColor: colors.ink, backgroundColor: colors.soft },
-  choiceText: { fontSize: 16, color: colors.ink },
+  choiceText: { fontSize: 15, lineHeight: 22, color: colors.ink, flex: 1 },
 });
