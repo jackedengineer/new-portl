@@ -5,6 +5,7 @@ export async function accountWorker(
   db: PrismaClient,
   logger: Logger,
   storage: DeletionLedger,
+  onWork: () => void = () => {},
 ) {
   const [grants] = await db.$queryRaw<
     { process: boolean; cleanup: boolean; lifecycle: boolean }[]
@@ -50,8 +51,10 @@ export async function accountWorker(
         logger.error(
           'Account deletion cleanup failed and is scheduled for retry',
         );
-      if (row?.status === 'COMPLETED')
+      if (row?.status === 'COMPLETED') {
         logger.info('Account deletion cleanup completed');
+        onWork();
+      }
     } catch {
       logger.error(
         'Account lifecycle worker unavailable; pending requests remain queued',

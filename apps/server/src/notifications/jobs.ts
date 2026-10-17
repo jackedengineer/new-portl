@@ -2,6 +2,7 @@ import { databasePool } from '../database/client.js';
 import { PgBoss, fromPrisma } from 'pg-boss';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { withActor, type Actor, type Tx } from '../registry/context.js';
+import { signalWorker } from '../hosting/activity.js';
 const senders = new WeakMap<PrismaClient, Promise<PgBoss>>();
 export function notificationQueue(db: PrismaClient, worker = false) {
   const boss = new PgBoss({
@@ -11,6 +12,9 @@ export function notificationQueue(db: PrismaClient, worker = false) {
     supervise: worker,
     schedule: false,
     reindex: false,
+    // Producer queues are fixed during provisioning. Avoid an idle SQL query
+    // every minute that prevents the managed database from suspending.
+    queueCacheIntervalSeconds: worker ? 60 : 86400,
   });
   // Library errors can contain job data/provider tokens. Never serialize raw errors.
   boss.on('error', () => console.error('Notification queue operation failed'));
@@ -76,5 +80,7 @@ export async function withNotificationTransaction<T>(
   work: (tx: Tx) => Promise<T>,
 ) {
   await sender(db); // Never wait for queue startup while holding a domain transaction connection.
-  return withActor(db, actor, work);
+  const result = await withActor(db, actor, work);
+  signalWorker();
+  return result;
 }

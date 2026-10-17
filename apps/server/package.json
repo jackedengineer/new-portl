@@ -6,6 +6,7 @@
   "scripts": {
     "dev:api": "tsx watch --env-file-if-exists=.env src/api.ts",
     "start:api": "node --env-file-if-exists=.env dist/api.js",
+    "start:render": "node --env-file-if-exists=.env dist/render.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
     "lint": "eslint src scripts prisma.config.ts vitest.config.ts vitest.integration.config.ts",

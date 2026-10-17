@@ -12,6 +12,7 @@ import { parseAuthEnv } from './config/auth-env.js';
 import { assertRestrictedRuntime, createDatabase } from './database/client.js';
 import { createAuth } from './auth/auth.js';
 import { resendDelivery } from './auth/email.js';
+import { signalWorker } from './hosting/activity.js';
 
 const env = parseRuntimeEnv(process.env);
 const logger = pino({ level: env.LOG_LEVEL, base: { service: 'portl-api' } });
@@ -44,8 +45,17 @@ const live = createGateSocketServer(server, {
   acceptsOrigin: auth.acceptsOrigin,
   budget: (userId) => auth.budget(userId, 'gate-live-connect', 20, 60),
 });
+// Completed application requests keep draining during active use. Health and
+// public legal reads never wake the database worker. Lost hints are recoverable.
+server.on('request', (req, res) => {
+  if (!/^\/(v1\/|api\/auth\/|delete-account\/)/.test(req.url ?? '')) return;
+  res.once('finish', () => {
+    if (res.statusCode >= 200 && res.statusCode < 400) signalWorker();
+  });
+});
 server.listen(env.PORT, env.HOST, () => {
   logger.info({ port: env.PORT }, 'API listening');
+  process.send?.({ type: 'ready' }, () => {});
 });
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
@@ -69,6 +79,7 @@ function shutdown(signal: string) {
     clearTimeout(deadline);
     await stopNotificationQueue(db);
     await db.$disconnect();
+    if (process.connected) process.disconnect?.();
   });
 }
 
