@@ -51,7 +51,7 @@ export function useOperationList<T>(
         signal,
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
-    refetchInterval: live.enabled ? 15000 : false,
+    refetchInterval: live.enabled ? 60_000 : false,
     refetchOnWindowFocus: 'always',
   });
   return {

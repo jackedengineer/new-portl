@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../components/refresh-button';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -61,7 +62,7 @@ export function VisitorQueue({
         userId,
       ),
     enabled: live.enabled,
-    refetchInterval: 5000,
+    refetchInterval: live.enabled ? (connected ? 60_000 : 30_000) : false,
     staleTime: 0,
   });
   if (presentation === 'summary')
@@ -78,11 +79,11 @@ export function VisitorQueue({
           </Copy>
         )}
         {query.error && (
-          <Button
+          <RefreshButton
             label="Retry visitors"
             variant="secondary"
-            pending={query.isFetching}
-            onPress={() => void query.refetch()}
+            disabled={query.isFetching}
+            onRefresh={() => query.refetch()}
           />
         )}
       </>
@@ -144,7 +145,7 @@ export function VisitorQueue({
             ? 'Updates paused. Refresh before relying on this status.'
             : connected
               ? 'Live gate updates are connected.'
-              : 'Connecting to live updates. Checking gate status every 5 seconds.'}
+              : 'Connecting to live updates. Checking gate status in the background.'}
       </Copy>
       {query.isPending && <Loading label="Checking the gate…" />}
       <ErrorMessage message={query.error ? messageOf(query.error) : null} />
@@ -197,11 +198,11 @@ export function VisitorQueue({
           />
         )}
       </Row>
-      <Button
+      <RefreshButton
         label="Refresh visitors"
         variant="quiet"
-        pending={query.isFetching}
-        onPress={() => void query.refetch()}
+        disabled={query.isFetching}
+        onRefresh={() => query.refetch()}
       />
     </>
   );

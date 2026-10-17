@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { useNetworkState } from 'expo-network';
-export function useLiveGate() {
+export function useLiveGate(trackTime = false) {
   const focused = useIsFocused();
   const network = useNetworkState();
   const [active, setActive] = useState(AppState.currentState === 'active');
@@ -18,10 +18,10 @@ export function useLiveGate() {
     network.isConnected !== false && network.isInternetReachable !== false;
   const enabled = focused && active && online;
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !trackTime) return;
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [enabled]);
+  }, [enabled, trackTime]);
   return { enabled, online, clock };
 }
 export const gatePath = (sid: string, suffix: string) =>

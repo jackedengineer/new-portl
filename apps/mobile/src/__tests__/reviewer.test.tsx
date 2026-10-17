@@ -74,7 +74,7 @@ it('requires explicit acceptance and shared-account acknowledgement, then verifi
       },
     },
   });
-  expect(mockReplace).toHaveBeenCalledWith('/community');
+  expect(mockReplace).not.toHaveBeenCalled();
 });
 it('keeps failed reviewer credentials out of authenticated routes', async () => {
   mockFetch.mockResolvedValue({ error: { status: 401 } });

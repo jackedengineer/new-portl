@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../components/refresh-button';
 import { useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -38,7 +39,7 @@ export function NoticeBoard({
         signal,
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
-    refetchInterval: enabled ? 15000 : false,
+    refetchInterval: enabled ? 60_000 : false,
     refetchOnWindowFocus: 'always',
   });
   const items = list.error
@@ -110,11 +111,11 @@ export function NoticeBoard({
           onPress={() => void list.fetchNextPage()}
         />
       )}
-      <Button
+      <RefreshButton
         label={list.error ? 'Retry notices' : 'Refresh notices'}
         variant="quiet"
-        pending={list.isRefetching}
-        onPress={() => void list.refetch()}
+        disabled={list.isFetching}
+        onRefresh={() => list.refetch()}
       />
     </>
   );

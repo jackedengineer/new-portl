@@ -103,21 +103,28 @@ function Session({ children }: { children: ReactNode }) {
   }
   async function signedIn() {
     revision.current++;
-    setChallenge(null);
-    await client.cancelQueries();
-    client.removeQueries({
-      predicate: (query) => query.queryKey[0] !== 'identity',
-    });
-    client.getMutationCache().clear();
-    await client.invalidateQueries({
-      queryKey: ['identity'],
-      exact: true,
-      refetchType: 'none',
-    });
-    await client.fetchQuery({
-      queryKey: ['identity'],
-      queryFn: ({ signal }) => readIdentity(signal),
-    });
+    setPendingCleanups((count) => count + 1);
+    try {
+      await client.cancelQueries();
+      client.removeQueries({
+        predicate: (query) => query.queryKey[0] !== 'identity',
+      });
+      client.getMutationCache().clear();
+      await client.invalidateQueries({
+        queryKey: ['identity'],
+        exact: true,
+        refetchType: 'none',
+      });
+      await client.fetchQuery({
+        queryKey: ['identity'],
+        queryFn: ({ signal }) => readIdentity(signal),
+      });
+      // Keep verification mounted until identity is authoritative. Protected
+      // routes then choose the destination, including required account flows.
+      setChallenge(null);
+    } finally {
+      setPendingCleanups((count) => count - 1);
+    }
   }
   async function changeAccount(
     expectedUserId: string,

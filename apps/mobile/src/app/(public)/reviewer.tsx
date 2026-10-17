@@ -1,6 +1,5 @@
 import { Segments } from '../../components/task-ui';
 import { useState } from 'react';
-import { router } from 'expo-router';
 import { reviewerSignInInput } from '@portl/contracts';
 import { useSession } from '../../auth/session';
 import { authClient } from '../../lib/auth-client';
@@ -47,7 +46,6 @@ export default function Reviewer() {
         );
       setKey('');
       await signedIn();
-      router.replace('/community');
     } catch (e) {
       setError(messageOf(e));
     } finally {

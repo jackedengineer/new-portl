@@ -51,7 +51,6 @@ export default function Verify() {
             : 'This code is invalid or has expired. Check it or request a new code.',
         );
       await signedIn();
-      router.replace('/community');
     } catch (e) {
       setError(messageOf(e));
     } finally {

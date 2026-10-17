@@ -1,18 +1,22 @@
 import {
   fireEvent,
+  act,
   render,
   screen,
   waitFor,
 } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AppState } from 'react-native';
+import { ActivityIndicator, AppState } from 'react-native';
 import { VisitorQueue } from '../features/gate/visitor-queue';
 import { Registration } from '../features/gate/registration';
 import { AdminGates } from '../features/gate/admin-gates';
 import { VisitDetail } from '../features/gate/visit-detail';
 import { PassCreate } from '../features/gate/pass-create';
 import { PassVerify } from '../features/gate/pass-verify';
-jest.mock('../features/gate/socket', () => ({ useGateSocket: () => true }));
+let mockSocketConnected = true;
+jest.mock('../features/gate/socket', () => ({
+  useGateSocket: () => mockSocketConnected,
+}));
 const mockApi = jest.fn();
 let mockOnline = true;
 jest.mock('../features/gate/live', () => ({
@@ -64,6 +68,106 @@ const visitor = {
   approvedUntil: null,
   decidedAt: null,
 };
+function showQueue() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <VisitorQueue userId="u1" societyId="s1" view="RESIDENT" />
+    </QueryClientProvider>,
+  );
+  return client;
+}
+it('shows just one loading indicator while the initial gate queue is loading', async () => {
+  let resolve!: (value: unknown) => void;
+  mockApi.mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  const client = showQueue();
+  expect(screen.UNSAFE_getAllByType(ActivityIndicator)).toHaveLength(1);
+  await act(async () => resolve({ items: [visitor], nextCursor: null }));
+  await screen.findByText('A Guest');
+  client.clear();
+});
+it('keeps existing queue content and refresh button quiet during a background update', async () => {
+  mockApi.mockResolvedValue({ items: [visitor], nextCursor: null });
+  const client = showQueue();
+  await screen.findByText('A Guest');
+  let resolve!: (value: unknown) => void;
+  mockApi.mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  let refreshing!: Promise<void>;
+  await act(async () => {
+    refreshing = client.refetchQueries();
+  });
+  const busy = screen.getByRole('button', { name: 'Refresh visitors' }).props
+    .accessibilityState.busy;
+  const indicators = screen.UNSAFE_queryAllByType(ActivityIndicator).length;
+  expect(screen.getByText('A Guest')).toBeTruthy();
+  await act(async () => {
+    resolve({ items: [visitor], nextCursor: null });
+    await refreshing;
+  });
+  expect(busy).toBe(false);
+  expect(indicators).toBe(0);
+  client.clear();
+});
+it('shows refresh feedback only after a resident explicitly requests an update', async () => {
+  mockApi.mockResolvedValue({ items: [visitor], nextCursor: null });
+  const client = showQueue();
+  await screen.findByText('A Guest');
+  let resolve!: (value: unknown) => void;
+  mockApi.mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  fireEvent.press(screen.getByRole('button', { name: 'Refresh visitors' }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Refresh visitors' }).props
+        .accessibilityState.busy,
+    ).toBe(true),
+  );
+  expect(screen.getByText('A Guest')).toBeTruthy();
+  await act(async () => resolve({ items: [], nextCursor: null }));
+  await screen.findByText('No visitors waiting');
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Refresh visitors' }).props
+        .accessibilityState.busy,
+    ).toBe(false),
+  );
+  client.clear();
+});
+it('uses a thirty-second fallback instead of polling the gate queue every five seconds', async () => {
+  jest.useFakeTimers();
+  mockSocketConnected = false;
+  mockApi.mockResolvedValue({ items: [visitor], nextCursor: null });
+  const client = showQueue();
+  try {
+    await screen.findByText('A Guest');
+    const initial = mockApi.mock.calls.length;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5000);
+    });
+    const afterFiveSeconds = mockApi.mock.calls.length;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(25000);
+    });
+    expect(afterFiveSeconds).toBe(initial);
+    expect(mockApi.mock.calls.length).toBe(initial + 1);
+  } finally {
+    client.clear();
+    jest.useRealTimers();
+  }
+});
 function show(view: 'RESIDENT' | 'GUARD' | 'ADMIN' = 'RESIDENT') {
   const client = new QueryClient({
     defaultOptions: {
@@ -82,6 +186,7 @@ function show(view: 'RESIDENT' | 'GUARD' | 'ADMIN' = 'RESIDENT') {
 }
 beforeEach(() => {
   mockOnline = true;
+  mockSocketConnected = true;
   mockApi.mockImplementation((path: string, _schema: unknown, body: unknown) =>
     Promise.resolve(
       body
