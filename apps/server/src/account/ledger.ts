@@ -14,6 +14,19 @@ const entrySchema = z.strictObject({
   expiresAt: z.iso.datetime(),
 });
 export type LedgerEntry = z.infer<typeof entrySchema>;
+export const ledgerEntriesSchema = z.array(entrySchema).max(100);
+export type DeletionLedger = {
+  assertReady: () => Promise<void>;
+  persist: (entries: LedgerEntry[]) => Promise<void>;
+  cleanup: () => Promise<void>;
+};
+export function fileLedger(directory: string): DeletionLedger {
+  return {
+    assertReady: () => assertLedgerDirectory(directory),
+    persist: (entries) => persistLedger(directory, entries),
+    cleanup: () => cleanupLedger(directory),
+  };
+}
 const filename = /^[a-f0-9]{64}\.json$/;
 const stagingName = /^\.[a-f0-9-]{36}\.tmp$/;
 const missing = (error: unknown) =>
@@ -73,7 +86,7 @@ export async function cleanupLedger(directory: string) {
 // Persist each subject before erasure. Preserve newer external tombstones when
 // replaying an older database snapshot. Bounded input, independent durable files.
 export async function persistLedger(directory: string, entries: LedgerEntry[]) {
-  z.array(entrySchema).max(100).parse(entries);
+  ledgerEntriesSchema.parse(entries);
   if (!isAbsolute(directory)) throw new Error('Ledger path must be absolute');
   await assertLedgerDirectory(directory);
   for (const entry of entries) {

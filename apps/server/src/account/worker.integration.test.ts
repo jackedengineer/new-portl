@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { createDatabase } from '../database/client.js';
 import { accountProof } from './proof.js';
-import { readLedger } from './ledger.js';
+import { readLedger, fileLedger } from './ledger.js';
 import { accountWorker } from './worker.js';
 import type { Logger } from 'pino';
 
@@ -41,7 +41,11 @@ it('runs metadata maintenance and completes erasure through the real restricted 
         receiptHash: proof.receipt(randomUUID()),
       },
     });
-    stop = await accountWorker(worker, logger as unknown as Logger, path);
+    stop = await accountWorker(
+      worker,
+      logger as unknown as Logger,
+      fileLedger(path),
+    );
     await stop();
     stop = undefined;
     expect(logger.error).not.toHaveBeenCalled();

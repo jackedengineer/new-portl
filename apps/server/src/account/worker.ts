@@ -1,10 +1,10 @@
-import { persistLedger, cleanupLedger } from './ledger.js';
+import type { DeletionLedger } from './ledger.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Logger } from 'pino';
 export async function accountWorker(
   db: PrismaClient,
   logger: Logger,
-  ledgerPath: string,
+  storage: DeletionLedger,
 ) {
   const [grants] = await db.$queryRaw<
     { process: boolean; cleanup: boolean; lifecycle: boolean }[]
@@ -16,23 +16,33 @@ export async function accountWorker(
     running: Promise<void> = Promise.resolve(),
     lastCleanup = 0;
   const tick = async () => {
+    // Unrelated cleanup still runs if the independent erasure ledger is unavailable.
+    try {
+      await db.$executeRaw`SELECT portl_auth.cleanup_review_lifecycle()`;
+      if (Date.now() - lastCleanup >= 3600000) {
+        await db.$executeRaw`SELECT portl_auth.cleanup_account_metadata()`;
+        lastCleanup = Date.now();
+        try {
+          await storage.assertReady();
+          await storage.cleanup();
+        } catch {
+          logger.error('Erasure ledger retention maintenance unavailable');
+        }
+      }
+    } catch {
+      logger.error('Account metadata maintenance unavailable');
+    }
     try {
       const ledger = await db.$queryRaw<
         { subjectHash: string; expiresAt: Date }[]
       >`SELECT * FROM portl_auth.account_deletion_ledger()`;
-      await persistLedger(
-        ledgerPath,
+      if (ledger.length) await storage.assertReady();
+      await storage.persist(
         ledger.map((row) => ({
           subjectHash: row.subjectHash,
           expiresAt: row.expiresAt.toISOString(),
         })),
       );
-      await db.$executeRaw`SELECT portl_auth.cleanup_review_lifecycle()`;
-      if (Date.now() - lastCleanup >= 3600000) {
-        await cleanupLedger(ledgerPath);
-        await db.$executeRaw`SELECT portl_auth.cleanup_account_metadata()`;
-        lastCleanup = Date.now();
-      }
       const [row] = await db.$queryRaw<
         { status: string }[]
       >`SELECT portl_auth.process_account_deletion(${ledger.map((row) => row.subjectHash)}::text[]) AS status`;

@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest';
 import type { Logger } from 'pino';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { accountWorker } from './worker.js';
-import { readLedger } from './ledger.js';
+import { readLedger, fileLedger } from './ledger.js';
 it.each([false, true])(
   'allows erasure only after durable ledger persistence (disk unavailable: %s)',
   async (unavailable) => {
@@ -37,12 +37,13 @@ it.each([false, true])(
       const stop = await accountWorker(
         { $queryRaw: query, $executeRaw: execute } as unknown as PrismaClient,
         logger as unknown as Logger,
-        path,
+        fileLedger(path),
       );
       await stop();
       expect(processed).toBe(!unavailable);
-      expect(execute).toHaveBeenCalledTimes(unavailable ? 0 : 2);
-      expect(logger.error).toHaveBeenCalledTimes(unavailable ? 1 : 0);
+      // A ledger outage must block erasure without blocking unrelated lifecycle cleanup.
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenCalledTimes(unavailable ? 2 : 0);
     } finally {
       await rm(path, { recursive: true, force: true });
     }

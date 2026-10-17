@@ -1,5 +1,11 @@
 import { mkdir } from 'node:fs/promises';
-import { assertLedgerDirectory } from './account/ledger.js';
+import { fileLedger, type DeletionLedger } from './account/ledger.js';
+import {
+  databaseLedger,
+  independentLedgerUrl,
+} from './account/database-ledger.js';
+import pg from 'pg';
+import { postgresOptions } from './database/connection.js';
 import { isAbsolute, resolve } from 'node:path';
 import { accountWorker } from './account/worker.js';
 import { pino } from 'pino';
@@ -28,11 +34,20 @@ const config = z
       z.string().refine(isAbsolute).optional(),
     ),
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+    ERASURE_LEDGER_DATABASE_URL: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.url().optional(),
+    ),
   })
   .safeParse(process.env);
 if (
   !config.success ||
-  (env.NODE_ENV === 'production' && !config.data.ACCOUNT_DELETION_LEDGER_DIR)
+  (env.NODE_ENV === 'production' &&
+    !config.data.ACCOUNT_DELETION_LEDGER_DIR &&
+    !config.data.ERASURE_LEDGER_DATABASE_URL) ||
+  (config.success &&
+    !!config.data.ACCOUNT_DELETION_LEDGER_DIR &&
+    !!config.data.ERASURE_LEDGER_DATABASE_URL)
 ) {
   logger.fatal(
     'Configure WORKER_DATABASE_URL and BETTER_AUTH_SECRET; secrets withheld',
@@ -44,13 +59,29 @@ const db = createDatabase(config.data.WORKER_DATABASE_URL),
   cipher = tokenCipher(config.data.BETTER_AUTH_SECRET),
   provider = expoProvider(config.data.EXPO_ACCESS_TOKEN);
 let stopAccounts: (() => Promise<void>) | undefined;
+let ledgerClient: pg.Pool | undefined;
 try {
-  const ledgerPath =
-    config.data.ACCOUNT_DELETION_LEDGER_DIR ||
-    resolve('.private/account-deletions');
-  if (env.NODE_ENV !== 'production')
-    await mkdir(ledgerPath, { recursive: true, mode: 0o700 });
-  await assertLedgerDirectory(ledgerPath);
+  let storage: DeletionLedger;
+  if (config.data.ERASURE_LEDGER_DATABASE_URL) {
+    ledgerClient = new pg.Pool({
+      ...postgresOptions(
+        independentLedgerUrl(
+          config.data.ERASURE_LEDGER_DATABASE_URL,
+          config.data.WORKER_DATABASE_URL,
+        ),
+      ),
+      max: 1,
+    });
+    storage = databaseLedger(ledgerClient);
+  } else {
+    const ledgerPath =
+      config.data.ACCOUNT_DELETION_LEDGER_DIR ||
+      resolve('.private/account-deletions');
+    if (env.NODE_ENV !== 'production')
+      await mkdir(ledgerPath, { recursive: true, mode: 0o700 });
+    storage = fileLedger(ledgerPath);
+    await storage.assertReady();
+  }
   await assertNotificationWorker(db);
   await boss.start();
   for (const name of ['notification.push', 'notification.receipt'] as const)
@@ -90,7 +121,7 @@ try {
         }
       },
     );
-  stopAccounts = await accountWorker(db, logger, ledgerPath);
+  stopAccounts = await accountWorker(db, logger, storage);
   logger.info('Notification and account lifecycle worker ready');
 } catch {
   logger.fatal(
@@ -98,6 +129,7 @@ try {
   );
   await boss.stop();
   await db.$disconnect();
+  await ledgerClient?.end();
   process.exit(1);
 }
 const maintenance = setInterval(
@@ -116,6 +148,7 @@ async function stop() {
   await stopAccounts?.();
   await boss.stop({ timeout: 15000 });
   await db.$disconnect();
+  await ledgerClient?.end();
 }
 process.once('SIGTERM', () => void stop());
 process.once('SIGINT', () => void stop());
