@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../components/refresh-button';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -211,11 +212,11 @@ export function AdminGates({
           error || messageOfError(create.error || assign.error || remove.error)
         }
       />
-      <Button
+      <RefreshButton
         label="Refresh gate access"
         variant="quiet"
-        pending={setup.isFetching}
-        onPress={() => void setup.refetch()}
+        disabled={setup.isFetching}
+        onRefresh={() => setup.refetch()}
       />
     </>
   );

@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../components/refresh-button';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -37,7 +38,7 @@ export function NoticeDetail({
     queryKey: [...noticeKey(userId, societyId), 'detail', id, view],
     queryFn: ({ signal }) =>
       request.call(`/${id}?view=${view}`, noticeSchema, undefined, signal),
-    refetchInterval: enabled ? 15000 : false,
+    refetchInterval: enabled ? 60_000 : false,
     refetchOnWindowFocus: 'always',
   });
   const command = useMutation({
@@ -164,13 +165,13 @@ export function NoticeDetail({
       )}
       {!online && <Copy>Reconnect before changing this notice.</Copy>}
       <ErrorMessage message={command.error ? messageOf(command.error) : ''} />
-      <Button
+      <RefreshButton
         label="Refresh notice"
         variant="quiet"
-        pending={detail.isRefetching}
-        onPress={() => {
+        disabled={detail.isFetching}
+        onRefresh={() => {
           setConfirm(null);
-          void detail.refetch();
+          return detail.refetch();
         }}
       />
     </>

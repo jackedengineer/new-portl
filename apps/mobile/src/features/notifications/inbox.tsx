@@ -62,7 +62,7 @@ export function NotificationInbox({ userId }: { userId: string }) {
         userId,
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
-    refetchInterval: live ? 10000 : false,
+    refetchInterval: live ? 30_000 : false,
     refetchOnWindowFocus: 'always',
   });
   const open = useMutation({

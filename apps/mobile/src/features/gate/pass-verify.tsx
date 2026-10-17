@@ -36,7 +36,7 @@ export function PassVerify({
   userId: string;
   societyId: string;
 }) {
-  const live = useLiveGate(),
+  const live = useLiveGate(true),
     client = useQueryClient(),
     [code, setCode] = useState(''),
     [gateId, setGate] = useState(''),

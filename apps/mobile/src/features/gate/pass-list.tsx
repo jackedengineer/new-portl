@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../components/refresh-button';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -40,7 +41,7 @@ export function PassList({
         userId,
       ),
     enabled: live.enabled,
-    refetchInterval: 5000,
+    refetchInterval: live.enabled ? 30_000 : false,
     staleTime: 0,
   });
   const accessUnavailable =
@@ -97,7 +98,7 @@ export function PassList({
       <Copy small>
         {!live.online
           ? 'You’re offline. Reconnect for current pass status.'
-          : 'Passes refresh every 5 seconds while this screen is open.'}
+          : 'Passes update in the background while this screen is open.'}
       </Copy>
       {query.isPending && <Loading label="Checking guest passes…" />}
       <ErrorMessage message={query.error ? messageOf(query.error) : null} />
@@ -136,11 +137,11 @@ export function PassList({
           />
         )}
       </Row>
-      <Button
+      <RefreshButton
         label="Refresh passes"
         variant="quiet"
-        pending={query.isFetching}
-        onPress={() => void query.refetch()}
+        disabled={query.isFetching}
+        onRefresh={() => query.refetch()}
       />
     </>
   );

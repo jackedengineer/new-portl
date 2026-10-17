@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../components/refresh-button';
 import { StyleSheet, Text } from 'react-native';
 import { colors } from '../../components/theme';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -41,7 +42,7 @@ export function PassDetail({
   id: string;
   view: GateView;
 }) {
-  const live = useLiveGate(),
+  const live = useLiveGate(true),
     client = useQueryClient(),
     [code, setCode] = useState(''),
     [codeError, setCodeError] = useState<string | null>(null),
@@ -82,7 +83,7 @@ export function PassDetail({
       }
     },
     enabled: live.enabled,
-    refetchInterval: 5000,
+    refetchInterval: live.enabled ? 10_000 : false,
     staleTime: 0,
   });
   const setup = useQuery({
@@ -310,11 +311,11 @@ export function PassDetail({
         </Card>
       )}
       <ErrorMessage message={action.error ? messageOf(action.error) : null} />
-      <Button
+      <RefreshButton
         label="Refresh status"
         variant="secondary"
-        pending={query.isFetching}
-        onPress={() => void query.refetch()}
+        disabled={query.isFetching}
+        onRefresh={() => query.refetch()}
       />
       <Label>Movement history</Label>
       {!p.events.length && <Copy>No entry or exit has been recorded.</Copy>}

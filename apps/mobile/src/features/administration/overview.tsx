@@ -25,7 +25,7 @@ export function SocietyOverview({
         undefined,
         signal,
       ),
-    refetchInterval: enabled ? 15000 : false,
+    refetchInterval: enabled ? 60_000 : false,
     refetchOnWindowFocus: 'always',
   });
   const labels = {

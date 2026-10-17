@@ -105,7 +105,7 @@ it('verifies a complete OTP and revalidates server identity before navigation', 
       privacyVersion: '2026-10-14',
     },
   });
-  expect(mockReplace).toHaveBeenCalledWith('/community');
+  expect(mockReplace).not.toHaveBeenCalled();
 });
 it('keeps rejected OTPs out of the authenticated routes', async () => {
   mockChallenge = { email: 'a@example.com', sentAt: Date.now() };

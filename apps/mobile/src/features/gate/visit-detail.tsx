@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../components/refresh-button';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { randomUUID } from 'expo-crypto';
@@ -42,7 +43,7 @@ export function VisitDetail({
   id: string;
   view: GateView;
 }) {
-  const live = useLiveGate();
+  const live = useLiveGate(true);
   const connected = useGateSocket(userId, societyId, view, live.enabled);
   const client = useQueryClient();
   const [choice, setChoice] = useState<Action | null>(null);
@@ -60,7 +61,7 @@ export function VisitDetail({
         userId,
       ),
     enabled: live.enabled,
-    refetchInterval: 5000,
+    refetchInterval: live.enabled ? 10_000 : false,
     staleTime: 0,
   });
   const setup = useQuery({
@@ -156,7 +157,7 @@ export function VisitDetail({
         {fresh
           ? connected
             ? 'Live gate updates are connected.'
-            : 'Connecting to live updates. Checking gate status every 5 seconds.'
+            : 'Connecting to live updates. Checking gate status in the background.'
           : 'Status is not current. Reconnect and refresh before taking action.'}
       </Copy>
       <ErrorMessage message={action.error ? messageOf(action.error) : null} />
@@ -265,11 +266,11 @@ export function VisitDetail({
           )}
         </Card>
       )}
-      <Button
+      <RefreshButton
         label="Refresh status"
         variant="secondary"
-        pending={query.isFetching}
-        onPress={() => void query.refetch()}
+        disabled={query.isFetching}
+        onRefresh={() => query.refetch()}
       />
       <Label>Movement history</Label>
       {!r.events.length && <Copy>No entry or exit has been recorded.</Copy>}
