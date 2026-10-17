@@ -1,12 +1,15 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { accountProof } from './proof.js';
-import { readLedger } from './ledger.js';
+import type { LedgerEntry } from './ledger.js';
 // Owner-only offline operation. Never mount this as an HTTP endpoint.
-export async function restoreAccountErasures(db: PrismaClient, path: string) {
+export async function restoreAccountErasures(
+  db: PrismaClient,
+  source: AsyncIterable<LedgerEntry>,
+) {
   const proof = accountProof('restore-does-not-use-otp-or-email-hmac');
   let queued = 0;
-  for await (const entry of readLedger(path)) {
+  for await (const entry of source) {
     if (Date.parse(entry.expiresAt) <= Date.now()) continue;
     queued += await db.$transaction(async (tx) => {
       const users = await tx.$queryRaw<

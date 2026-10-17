@@ -128,6 +128,10 @@ The existing restricted worker also handles account erasure and hourly auth meta
 
 Development startup creates ignored `apps/server/.private/account-deletions`. Production requires `ACCOUNT_DELETION_LEDGER_DIR` pointing to an existing absolute, mode-0700 directory on a durable private volume. Create an empty directory only on a genuinely fresh deployment. Run one lifecycle worker, retain access-controlled independent backups, and monitor disk availability and pending deletion age. Each mode-0600 record holds a hashed former account ID and expiry; it is private data. Missing/corrupt storage fails closed and must be recovered, not replaced with an empty directory.
 
+Hosts without persistent disks may instead set **only** `ERASURE_LEDGER_DATABASE_URL`, using a restricted role in a dedicated independent Neon project. A second schema or branch restored with the business database is insufficient. The worker can execute bounded append and expiry-cleanup functions; it cannot read or directly mutate the ledger table. Owner credentials remain offline. Provision the new project's schema and worker role with `scripts/provision-erasure-ledger.ts --private-output /absolute/ignored/ledger.env`, loading `ERASURE_LEDGER_OWNER_URL` and the business `DIRECT_DATABASE_URL` from a private environment file. The output contains only the restricted ledger URL. Verify project independence and region in Neon before provisioning.
+
+Before moving hosts, freeze and drain the old worker, preserve its current ledger directory, and run `scripts/import-erasure-ledger.ts --frozen-source /absolute/private/ledger-directory` with private ledger runtime/owner and business URLs. This streams unexpired records, preserves the greater expiry and verifies every batch against the independent store; original files remain intact. Do not retire the old volume or resume erasure until this verification completes. An empty or lost source is not proof that no prior erasures exist.
+
 Keep API and worker offline during database restoration. Preserve the latest external ledger independently of the snapshot, apply current migrations, and run from `apps/server`:
 
 ```sh
@@ -135,6 +139,8 @@ pnpm exec tsx --env-file=.env scripts/account-restore.ts --offline-restore /abso
 ```
 
 The owner-only `DIRECT_DATABASE_URL` must point at the intended offline restored database. A failed run or remaining pending deletion blocks reopening. Verify erased identities/content absent and unrelated data intact before resuming service. All restorable database backups must be younger than the 90-day recovery-record lifetime; actual provider settings and a restore drill remain public-deployment requirements. The detailed versioned acceptance and operator procedures remain in the external specification set.
+
+For the independent database ledger, use `--offline-restore database` with `ERASURE_LEDGER_OWNER_URL` pointing to the current independent ledger project. It streams records in bounded pages. The business database stays offline throughout restoration; do not restore or replace the ledger with an earlier snapshot.
 
 ## Operator/admin recovery
 
