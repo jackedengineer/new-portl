@@ -1,6 +1,6 @@
 # Environment and credential setup
 
-Use separate development, staging and production resources and secrets. Start with development only. Put local values in `apps/server/.env` and `apps/mobile/.env.local`; both are ignored by Git. Do not send secret values in chat. Railway will hold deployed server secrets; EAS will hold build credentials.
+Use separate development, staging and production resources and secrets. Start with development only. Put local values in `apps/server/.env` and `apps/mobile/.env.local`; both are ignored by Git. Do not send secret values in chat. The production hosting service holds restricted server secrets; EAS holds build credentials. Render Free configuration and migration requirements are described below.
 
 ## Active: email OTP and the database
 
@@ -159,3 +159,9 @@ The worker drains claimed jobs before parking after 90 seconds without useful wo
 Free Render services can sleep, restart or suspend, and workspace running hours are shared. A separate free scheduler can request `https://api.portl.jacked.dev/health/live` every eight minutes to reduce idle sleeping; this endpoint performs no database query and must receive no credentials. A health ping does not prove worker progress or guarantee uptime. Do not substitute a paid Render worker, cron job or disk without owner approval.
 
 Before DNS cutover, verify CI, startup, worker parking/wake, current restricted grants, HTTPS and privacy disclosures. Freeze the previous worker, stream and verify its active erasure records into the independent ledger, and preserve the original volume. Do not restore the ledger with an older business-database backup. Railway trial volumes have a provider retention deadline; retaining the service configuration does not guarantee the volume survives indefinitely. Keep the old hostname target recorded for rollback, and change only the API hostname after the new service passes checks. No automatic production migration or demo-data reset runs during Render builds.
+
+### Offline restoration gate
+
+The independent ledger schema also holds an owner-only restoration gate, initialized blocked. New provisioning and reprovisioning of a missing singleton must not grant restore permission; rerunning provisioning preserves an existing block. `account-restore.ts` checks this gate before business erasure mutations whenever the independent owner URL is configured, for both database and file sources. Unavailable or missing gate state fails closed. Ordinary worker ledger persistence, expiry cleanup and owner verification remain available while blocked. Legacy standalone file restoration without an independent-project configuration remains supported for deployments that never migrated.
+
+Production restoration must use the current `ERASURE_LEDGER_OWNER_URL` from the independent project. Never omit it to bypass reconciliation. Only the controlled owner may clear the block after verifying all migration-era ledger records and completing restore acceptance. The metadata-only fallback does not establish that the inaccessible Railway volume was copied: keep this gate blocked until that gap is reconciled. Do not restore the business database through provider controls and reopen access around this procedure.

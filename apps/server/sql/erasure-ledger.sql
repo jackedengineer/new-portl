@@ -8,6 +8,15 @@ CREATE TABLE IF NOT EXISTS portl_erasure_ledger.tombstone (
 );
 REVOKE ALL ON portl_erasure_ledger.tombstone FROM PUBLIC;
 
+-- Operational migration gate: only the ledger owner may change it. Re-running
+-- provisioning must never clear a block while an older ledger is unreconciled.
+CREATE TABLE IF NOT EXISTS portl_erasure_ledger.restore_gate (
+  singleton boolean PRIMARY KEY CHECK (singleton),
+  blocked boolean NOT NULL
+);
+INSERT INTO portl_erasure_ledger.restore_gate VALUES (true,true) ON CONFLICT DO NOTHING;
+REVOKE ALL ON portl_erasure_ledger.restore_gate FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION portl_erasure_ledger.persist(entries jsonb) RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE e jsonb; expiry timestamptz; persisted integer:=0;
