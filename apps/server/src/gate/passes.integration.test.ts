@@ -1,4 +1,5 @@
 import { stopNotificationQueue } from '../notifications/jobs.js';
+import { notificationService } from '../notifications/service.js';
 import { passCodes } from '../gate/pass-codes.js';
 import { createHmac, randomUUID } from 'node:crypto';
 import request from 'supertest';
@@ -59,8 +60,8 @@ async function login() {
           ...body,
           policyAcceptance: {
             adult: true,
-            termsVersion: '2026-10-14',
-            privacyVersion: '2026-10-14',
+            termsVersion: '2026-10-18',
+            privacyVersion: '2026-10-18',
           },
         }),
       }),
@@ -373,6 +374,52 @@ it('verifies without consuming, requires code at entry, and records one entry an
       await call(guard, 'get', 'passes?view=GUARD&filter=HISTORY')
     ).body.items.some((r: { id: string }) => r.id === p.id),
   ).toBe(true);
+});
+it('describes guest entry and exit using each recorded gate without disclosing the pass code', async () => {
+  const p = await create();
+  const side = await owner.gate.create({
+    data: { societyId: sid, name: `Side gate ${randomUUID()}` },
+  });
+  await owner.guardAssignment.create({
+    data: {
+      societyId: sid,
+      gateId: side.id,
+      userId: guard.id,
+      createdBy: admin.id,
+    },
+  });
+  const service = notificationService(db),
+    actor = {
+      userId: resident.id,
+      email: resident.email,
+      sessionId: resident.sessionId,
+      requestId: randomUUID(),
+    };
+  for (const [kind, gate, version, type] of [
+    ['entry', gateId, 1, 'GUEST_ENTERED'],
+    ['exit', side.id, 2, 'GUEST_EXITED'],
+  ] as const) {
+    const response = await call(
+      guard,
+      'post',
+      `passes/${p.id}/${kind}`,
+      movement(version, {
+        gateId: gate,
+        ...(kind === 'entry' ? { code: p.code } : {}),
+      }),
+    );
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const n = await owner.notification.findFirstOrThrow({
+      where: { resourceId: p.id, userId: resident.id, type },
+    });
+    const preview = (await service.detail(actor, n.id)).preview;
+    expect(preview.body).toContain('Synthetic invited guest');
+    expect(preview.body).toContain(
+      (await owner.gate.findUniqueOrThrow({ where: { id: gate } })).name,
+    );
+    expect(preview.body).toContain(kind === 'entry' ? 'entered' : 'exited');
+    expect(JSON.stringify(preview)).not.toContain(p.code);
+  }
 });
 it('serializes competing redemption and revocation into one winning action', async () => {
   const p = await create();

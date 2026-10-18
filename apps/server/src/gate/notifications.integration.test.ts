@@ -67,8 +67,8 @@ async function login() {
           ...body,
           policyAcceptance: {
             adult: true,
-            termsVersion: '2026-10-14',
-            privacyVersion: '2026-10-14',
+            termsVersion: '2026-10-18',
+            privacyVersion: '2026-10-18',
           },
         }),
       }),
@@ -296,6 +296,10 @@ it('durably sends once, rechecks revoked sessions and ignores invalid receipts f
     await deliverNotification(workerDb, boss, provider, cipher, n.id);
     await deliverNotification(workerDb, boss, provider, cipher, n.id);
     expect(provider.send).toHaveBeenCalledTimes(1);
+    expect(provider.send.mock.calls[0]?.[3]).toEqual({
+      title: 'Visitor approval needed',
+      body: `Synthetic Guest is waiting at ${(await owner.gate.findUniqueOrThrow({ where: { id: gateId } })).name}.`,
+    });
     const delivery = await owner.delivery.findFirstOrThrow({
       where: { notificationId: n.id },
     });
@@ -322,6 +326,155 @@ it('durably sends once, rechecks revoked sessions and ignores invalid receipts f
   } finally {
     await boss.stop();
     await service.remove(asActor(resident), installationId);
+  }
+});
+it('limits previews to current recipients and withholds personal push content until policy renewal', async () => {
+  const service = notificationService(db, cipher);
+  const installationId = randomUUID();
+  await service.register(asActor(resident), {
+    installationId,
+    token: 'ExpoPushToken[preview-policy-test]',
+    platform: 'android',
+  });
+  const { result } = await register();
+  const n = await owner.notification.findFirstOrThrow({
+    where: { resourceId: result.requestId, userId: resident.id },
+  });
+  const before = await service.detail(asActor(resident), n.id);
+  expect(before.preview.body).toContain('Synthetic Guest');
+  expect(
+    (await service.list(asActor(resident))).items.find((row) => row.id === n.id)
+      ?.preview,
+  ).toEqual(before.preview);
+  await expect(service.detail(asActor(outsider), n.id)).rejects.toThrow(
+    'no longer available',
+  );
+  await expect(
+    workerDb.$queryRaw`SELECT portl_notifications.preview_context(${n.id})`,
+  ).rejects.toThrow();
+  const original = await owner.accountPolicy.findUniqueOrThrow({
+    where: { userId: resident.id },
+  });
+  try {
+    await owner.accountPolicy.update({
+      where: { userId: resident.id },
+      data: { version: '2026-10-14' },
+    });
+    const [target] = await workerDb.$queryRaw<
+      { context: object }[]
+    >`SELECT * FROM portl_notifications.delivery_previews(${n.id})`;
+    expect(target?.context).toEqual({});
+    const boss = notificationQueue(workerDb);
+    await boss.start();
+    try {
+      const provider = {
+        send: vi.fn().mockResolvedValue({
+          status: 'ok',
+          ticketId: 'generic-policy-ticket',
+        }),
+        receipt: vi.fn(),
+      };
+      await deliverNotification(workerDb, boss, provider, cipher, n.id);
+      expect(provider.send).toHaveBeenCalledOnce();
+      expect(provider.send.mock.calls[0]?.[3]).toEqual({
+        title: 'Visitor approval needed',
+        body: 'Open Portl to review a request from the gate.',
+      });
+    } finally {
+      await boss.stop();
+    }
+    expect(
+      (await service.detail(asActor(resident), n.id)).preview.body,
+    ).not.toContain('Synthetic Guest');
+  } finally {
+    await owner.accountPolicy.update({
+      where: { userId: resident.id },
+      data: { version: original.version },
+    });
+    await service.remove(asActor(resident), installationId);
+  }
+});
+it('shows guard decision previews only while gate access remains active', async () => {
+  const service = notificationService(db, cipher);
+  for (const decision of ['APPROVE', 'REJECT'] as const) {
+    const { result } = await register();
+    const response = await call(
+      resident,
+      'post',
+      `requests/${result.requestId}/decision`,
+      {
+        intentId: randomUUID(),
+        expectedVersion: 1,
+        decision,
+      },
+    );
+    expect(response.status).toBe(200);
+    const n = await owner.notification.findFirstOrThrow({
+      where: {
+        resourceId: result.requestId,
+        userId: guard.id,
+        type: decision === 'APPROVE' ? 'VISITOR_APPROVED' : 'VISITOR_REJECTED',
+      },
+    });
+    const preview = (await service.detail(asActor(guard), n.id)).preview;
+    expect(preview.body).toContain('Synthetic Guest');
+    expect(preview.body).toContain(
+      (await owner.gate.findUniqueOrThrow({ where: { id: gateId } })).name,
+    );
+    await owner.guardAssignment.updateMany({
+      where: { userId: guard.id, gateId },
+      data: { active: false },
+    });
+    try {
+      await expect(service.detail(asActor(guard), n.id)).rejects.toThrow(
+        'no longer available',
+      );
+    } finally {
+      await owner.guardAssignment.updateMany({
+        where: { userId: guard.id, gateId },
+        data: { active: true },
+      });
+    }
+  }
+});
+it('uses the entry and exit movement gates rather than the original request gate', async () => {
+  const service = notificationService(db, cipher);
+  const { result } = await register();
+  expect((await approve(result.requestId)).status).toBe(200);
+  const exitGate = await owner.gate.create({
+    data: { societyId: sid, name: `Side gate ${randomUUID()}` },
+  });
+  await owner.guardAssignment.create({
+    data: {
+      societyId: sid,
+      userId: guard.id,
+      gateId: exitGate.id,
+      createdBy: admin.id,
+    },
+  });
+  for (const [kind, gate, version] of [
+    ['entry', gateId, 2],
+    ['exit', exitGate.id, 3],
+  ] as const) {
+    const response = await call(
+      guard,
+      'post',
+      `requests/${result.requestId}/${kind}`,
+      { intentId: randomUUID(), expectedVersion: version, gateId: gate },
+    );
+    expect(response.status, response.body.error?.message).toBe(200);
+    const n = await owner.notification.findFirstOrThrow({
+      where: {
+        resourceId: result.requestId,
+        userId: resident.id,
+        type: kind === 'entry' ? 'VISITOR_ENTERED' : 'VISITOR_EXITED',
+      },
+    });
+    const preview = (await service.detail(asActor(resident), n.id)).preview;
+    expect(preview.body).toContain(
+      (await owner.gate.findUniqueOrThrow({ where: { id: gate } })).name,
+    );
+    expect(preview.body).toContain(kind === 'entry' ? 'entered' : 'exited');
   }
 });
 it('attempts healthy devices when another device needs a retry', async () => {
@@ -498,7 +651,9 @@ it('publishes a private, deduplicated inbox and hides it after occupancy revocat
   expect(matches).toHaveLength(1);
   const n = matches[0];
   expect(n.type).toBe('VISITOR_REQUESTED');
-  expect(JSON.stringify(n)).not.toContain('Synthetic Guest');
+  expect(n.preview.body).toContain('Synthetic Guest');
+  expect(Object.keys(n)).not.toContain('visitorName');
+  expect(Object.keys(n)).not.toContain('cipherText');
   expect(
     (
       await request(app)

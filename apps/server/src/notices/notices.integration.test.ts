@@ -65,8 +65,8 @@ async function login() {
           ...body,
           policyAcceptance: {
             adult: true,
-            termsVersion: '2026-10-14',
-            privacyVersion: '2026-10-14',
+            termsVersion: '2026-10-18',
+            privacyVersion: '2026-10-18',
           },
         }),
       }),
@@ -399,6 +399,11 @@ it('removes archived notices from resident inbox and worker targeting while reta
   expect(
     (await notificationService(db).detail(actor(resident), note.id)).resourceId,
   ).toBe(item.id);
+  const preview = (
+    await notificationService(db).detail(actor(resident), note.id)
+  ).preview;
+  expect(preview.title).toBe(item.title);
+  expect(preview.body).toContain(item.body.slice(0, 30));
   expect(
     (
       await workerDb.$queryRaw<
@@ -417,6 +422,9 @@ it('removes archived notices from resident inbox and worker targeting while reta
   await expect(
     notificationService(db).detail(actor(resident), note.id),
   ).rejects.toMatchObject({ status: 404 });
+  expect(
+    await workerDb.$queryRaw`SELECT * FROM portl_notifications.delivery_previews(${note.id})`,
+  ).toEqual([]);
   expect(
     (await owner.notification.findUniqueOrThrow({ where: { id: note.id } }))
       .pushEligible,

@@ -56,6 +56,9 @@ it('loads a private inbox and opens only the authorized, fresh destination', asy
     </QueryClientProvider>,
   );
   await screen.findByText('Visitor approval needed');
+  expect(
+    screen.getByText('Open Portl to review a request from the gate.'),
+  ).toBeTruthy();
   expect(screen.getByText(/Push alerts need an installed/)).toBeTruthy();
   fireEvent.press(screen.getByRole('button', { name: 'Open notification' }));
   await waitFor(() =>
@@ -77,4 +80,34 @@ it('rejects arbitrary links before loading and propagates revoked access', async
   await expect(
     notificationDestination({ notificationId: item.id }, load),
   ).rejects.toThrow('no longer available');
+});
+
+it('renders contextual server preview text without changing the destination', async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  mockApi.mockResolvedValue({
+    items: [
+      {
+        ...item,
+        preview: {
+          title: 'Visitor approval needed',
+          body: 'Asha is waiting at Main Gate.',
+        },
+      },
+    ],
+    nextCursor: null,
+    unread: 1,
+  });
+  const mounted = render(
+    <QueryClientProvider client={client}>
+      <NotificationInbox userId="user" />
+    </QueryClientProvider>,
+  );
+  await screen.findByText('Asha is waiting at Main Gate.');
+  expect(
+    screen.queryByText('Open Portl to review a request from the gate.'),
+  ).toBeNull();
+  mounted.unmount();
+  client.clear();
 });
