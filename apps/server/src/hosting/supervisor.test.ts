@@ -8,6 +8,7 @@ class Child extends EventEmitter {
 afterEach(() => vi.useRealTimers());
 it('passes only each process’s required credentials', () => {
   const env = {
+    TRUST_PROXY_HOPS: '1',
     DATABASE_URL: 'api',
     WORKER_DATABASE_URL: 'worker',
     ERASURE_LEDGER_DATABASE_URL: 'ledger',
@@ -18,6 +19,7 @@ it('passes only each process’s required credentials', () => {
     EXPO_ACCESS_TOKEN: 'expo',
   };
   expect(childEnvironment('api', env)).toEqual({
+    TRUST_PROXY_HOPS: '1',
     DATABASE_URL: 'api',
     BETTER_AUTH_SECRET: 'shared',
     RESEND_API_KEY: 'resend',

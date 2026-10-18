@@ -17,6 +17,8 @@ services:
         value: production
       - key: HOST
         value: 0.0.0.0
+      - key: TRUST_PROXY_HOPS
+        value: '1'
       - key: LOG_LEVEL
         value: info
       - key: BETTER_AUTH_URL
