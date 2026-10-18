@@ -1,6 +1,7 @@
 import { POLICY_VERSION } from '@portl/contracts';
 import { accountRouter } from './account/router.js';
 import { publicAccountRouter } from './account/public.js';
+import { requestClientIP, type TrustedIngress } from './hosting/client-ip.js';
 import type { GateSignal } from '@portl/contracts';
 import { notificationRouter } from './notifications/router.js';
 import { noticeRouter } from './notices/router.js';
@@ -35,10 +36,11 @@ type AppServices = {
 export function createApp(
   logger?: Logger,
   services?: AppServices,
-  trustedProxyHops: 0 | 1 = 0,
+  trustedIngress: TrustedIngress = 'none',
 ) {
   const app = express();
-  app.set('trust proxy', trustedProxyHops === 1 ? 1 : false);
+  app.set('trust proxy', false);
+  app.set('portl trusted ingress', trustedIngress);
   app.disable('x-powered-by');
   app.use(helmet());
   app.use((req, res, next) => {
@@ -114,9 +116,7 @@ export function createApp(
           return;
         }
         const headers = fromNodeHeaders(req.headers);
-        // Resolve through the configured ingress boundary; never trust the
-        // caller's internal auth header or the leftmost forwarded address.
-        headers.set('x-portl-client-ip', req.ip || '127.0.0.1');
+        headers.set('x-portl-client-ip', requestClientIP(req));
         headers.delete('content-length');
         // Use Better Auth's Fetch handler after bounded JSON parsing. Its Node adapter expects an unread stream.
         const response = await services.auth.handler(

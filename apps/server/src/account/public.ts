@@ -1,4 +1,5 @@
 import express from 'express';
+import { requestClientIP } from '../hosting/client-ip.js';
 import {
   POLICY_VERSION,
   deletionChallengeSchema,
@@ -139,7 +140,7 @@ export function publicAccountRouter(auth: PortlAuth, baseURL: string) {
           auth,
           String(req.params.action),
           req.body,
-          req.ip || '127.0.0.1',
+          requestClientIP(req),
         );
         if (req.params.action === 'start') {
           const challenge = deletionChallengeSchema.parse(result);

@@ -41,7 +41,7 @@ const server = createServer(
       tokenCipher: tokenCipher(authEnv.BETTER_AUTH_SECRET),
       onGateChange: (signal) => live.publish(signal),
     },
-    env.TRUST_PROXY_HOPS,
+    env.TRUSTED_INGRESS,
   ),
 );
 const live = createGateSocketServer(server, {
