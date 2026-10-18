@@ -71,8 +71,8 @@ beforeAll(async () => {
           ...body,
           policyAcceptance: {
             adult: true,
-            termsVersion: '2026-10-14',
-            privacyVersion: '2026-10-14',
+            termsVersion: '2026-10-18',
+            privacyVersion: '2026-10-18',
           },
         }),
       }),
@@ -393,8 +393,8 @@ it('gates existing sessions until adult policy acceptance, while keeping deletio
     (
       await route().send({
         adult: false,
-        termsVersion: '2026-10-14',
-        privacyVersion: '2026-10-14',
+        termsVersion: '2026-10-18',
+        privacyVersion: '2026-10-18',
       })
     ).status,
   ).toBe(422);
@@ -402,8 +402,8 @@ it('gates existing sessions until adult policy acceptance, while keeping deletio
     (
       await route().send({
         adult: true,
-        termsVersion: '2026-10-14',
-        privacyVersion: '2026-10-14',
+        termsVersion: '2026-10-18',
+        privacyVersion: '2026-10-18',
       })
     ).status,
   ).toBe(200);

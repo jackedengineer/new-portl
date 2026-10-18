@@ -69,8 +69,8 @@ it('requires explicit acceptance and shared-account acknowledgement, then verifi
       reviewAcknowledged: true,
       policyAcceptance: {
         adult: true,
-        termsVersion: '2026-10-14',
-        privacyVersion: '2026-10-14',
+        termsVersion: '2026-10-18',
+        privacyVersion: '2026-10-18',
       },
     },
   });

@@ -1,4 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import {
+  notificationPreview,
+  notificationType,
+  type NotificationContext,
+} from '@portl/contracts';
 import { PgBoss, fromPrisma } from 'pg-boss';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { TokenCipher } from './tokens.js';
@@ -9,11 +14,12 @@ type Target = {
   cipherText: string;
   type: string;
   expiresAt: Date;
+  context: NotificationContext;
 };
 const targets = (db: PrismaClient, id: string) =>
   db.$queryRaw<
     Target[]
-  >`SELECT * FROM portl_notifications.delivery_targets(${id})`;
+  >`SELECT * FROM portl_notifications.delivery_previews(${id})`;
 async function retire(db: PrismaClient, id: string, generation: string) {
   await db.$queryRaw`SELECT portl_notifications.retire_device(${id},${generation})::text`;
 }
@@ -62,6 +68,7 @@ export async function deliverNotification(
       cipher.open(live.cipherText, live.deviceId, live.generation),
       id,
       ttl,
+      notificationPreview(notificationType.parse(live.type), live.context),
     );
     if (result.status === 'retry') {
       await db.delivery.update({

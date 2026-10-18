@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { NotificationPreview } from '@portl/contracts';
 export type PushResult =
   | { status: 'ok'; ticketId?: string }
   | { status: 'retry'; code: string }
@@ -85,11 +86,12 @@ export function expoProvider(
       token: string,
       notificationId: string,
       ttl: number,
+      preview: NotificationPreview,
     ): Promise<PushResult> {
       const result = await post('send', {
         to: token,
-        title: 'Portl community update',
-        body: 'Open Portl to review your community update.',
+        title: preview.title,
+        body: preview.body,
         data: { notificationId },
         channelId: 'gate',
         sound: 'default',

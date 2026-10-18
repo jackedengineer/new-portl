@@ -72,8 +72,8 @@ async function call(
               ...body,
               policyAcceptance: {
                 adult: true,
-                termsVersion: '2026-10-14',
-                privacyVersion: '2026-10-14',
+                termsVersion: '2026-10-18',
+                privacyVersion: '2026-10-18',
               },
             }),
           }
@@ -351,8 +351,8 @@ describe('email OTP with PostgreSQL', () => {
           otp: sent.get(email),
           policyAcceptance: {
             adult: true,
-            termsVersion: '2026-10-14',
-            privacyVersion: '2026-10-14',
+            termsVersion: '2026-10-18',
+            privacyVersion: '2026-10-18',
           },
         });
       expect(signedIn.status).toBe(200);
@@ -581,7 +581,7 @@ it('requires explicit current policy and adult attestation before creating an ac
     otp = await issue(email);
   for (const policyAcceptance of [
     undefined,
-    { adult: false, termsVersion: '2026-10-14', privacyVersion: '2026-10-14' },
+    { adult: false, termsVersion: '2026-10-18', privacyVersion: '2026-10-18' },
     { adult: true, termsVersion: 'old', privacyVersion: 'old' },
   ]) {
     const response = await auth.handler(
@@ -602,5 +602,5 @@ it('requires explicit current policy and adult attestation before creating an ac
   const user = await db.user.findUniqueOrThrow({ where: { email } });
   expect(
     await db.accountPolicy.findUnique({ where: { userId: user.id } }),
-  ).toMatchObject({ version: '2026-10-14', adult: true });
+  ).toMatchObject({ version: '2026-10-18', adult: true });
 });

@@ -1,26 +1,43 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { DeviceRegistration } from '@portl/contracts';
+import {
+  notificationPreview,
+  notificationType,
+  type NotificationContext,
+  type DeviceRegistration,
+} from '@portl/contracts';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import {
   DomainError,
   scope,
   withActor,
   type Actor,
+  type Tx,
 } from '../registry/context.js';
 import type { TokenCipher } from './tokens.js';
 const cursorSchema = z.object({ at: z.iso.datetime(), id: z.uuid() });
 export function notificationService(db: PrismaClient, cipher?: TokenCipher) {
-  const dto = (n: {
-    id: string;
-    societyId: string;
-    type: string;
-    resourceKind: string;
-    resourceId: string;
-    view: string;
-    createdAt: Date;
-    readAt: Date | null;
-  }) => ({
+  async function previews(tx: Tx, ids: string[]) {
+    const rows = await tx.$queryRaw<
+      { id: string; context: NotificationContext }[]
+    >`
+      SELECT * FROM portl_notifications.inbox_previews(${ids}::text[])
+    `;
+    return new Map(rows.map((row) => [row.id, row.context]));
+  }
+  const dto = (
+    n: {
+      id: string;
+      societyId: string;
+      type: string;
+      resourceKind: string;
+      resourceId: string;
+      view: string;
+      createdAt: Date;
+      readAt: Date | null;
+    },
+    context?: NotificationContext,
+  ) => ({
     id: n.id,
     societyId: n.societyId,
     type: n.type,
@@ -29,6 +46,7 @@ export function notificationService(db: PrismaClient, cipher?: TokenCipher) {
     view: n.view,
     createdAt: n.createdAt.toISOString(),
     readAt: n.readAt?.toISOString() ?? null,
+    preview: notificationPreview(notificationType.parse(n.type), context),
   });
   const missing = () =>
     new DomainError(404, 'NOT_FOUND', 'Notification no longer available');
@@ -61,23 +79,28 @@ export function notificationService(db: PrismaClient, cipher?: TokenCipher) {
         }
         const rows: Awaited<ReturnType<typeof tx.notification.findMany>> = [];
         let unread = 0;
+        const contexts = new Map<string, NotificationContext>();
         const memberships = await societies(tx, actor);
         for (const sid of new Set(memberships.map((m) => m.societyId))) {
           await scope(tx, sid);
-          rows.push(
-            ...(await tx.notification.findMany({
-              where: cursor
-                ? {
-                    OR: [
-                      { createdAt: { lt: new Date(cursor.at) } },
-                      { createdAt: new Date(cursor.at), id: { lt: cursor.id } },
-                    ],
-                  }
-                : {},
-              orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-              take: 31,
-            })),
-          );
+          const found = await tx.notification.findMany({
+            where: cursor
+              ? {
+                  OR: [
+                    { createdAt: { lt: new Date(cursor.at) } },
+                    { createdAt: new Date(cursor.at), id: { lt: cursor.id } },
+                  ],
+                }
+              : {},
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: 31,
+          });
+          rows.push(...found);
+          for (const [id, context] of await previews(
+            tx,
+            found.map((row) => row.id),
+          ))
+            contexts.set(id, context);
           unread += await tx.notification.count({ where: { readAt: null } });
         }
         rows.sort(
@@ -88,7 +111,7 @@ export function notificationService(db: PrismaClient, cipher?: TokenCipher) {
         const items = rows.slice(0, 30),
           last = items.at(-1);
         return {
-          items: items.map(dto),
+          items: items.map((row) => dto(row, contexts.get(row.id))),
           unread,
           nextCursor:
             rows.length > 30 && last
@@ -117,9 +140,9 @@ export function notificationService(db: PrismaClient, cipher?: TokenCipher) {
             if (!changed.count) throw missing();
             const updated = await tx.notification.findUnique({ where: { id } });
             if (!updated) throw missing();
-            return dto(updated);
+            return dto(updated, (await previews(tx, [id])).get(id));
           }
-          return dto(row);
+          return dto(row, (await previews(tx, [id])).get(id));
         }
         throw missing();
       }),

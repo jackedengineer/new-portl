@@ -62,7 +62,7 @@ export async function provisionWorker(client: pg.Client, direct: string) {
       `CREATE POLICY delivery_worker ON portl_notifications."Delivery" TO ${who} USING (true) WITH CHECK (true)`,
     );
     await client.query(
-      `GRANT EXECUTE ON FUNCTION portl_notifications.delivery_targets(text),portl_notifications.retire_device(text,text),portl_notifications.cleanup() TO ${who}`,
+      `GRANT EXECUTE ON FUNCTION portl_notifications.delivery_targets(text),portl_notifications.delivery_previews(text),portl_notifications.retire_device(text,text),portl_notifications.cleanup() TO ${who}`,
     );
     await client.query(
       `GRANT EXECUTE ON FUNCTION portl_auth.account_deletion_ledger(), portl_auth.process_account_deletion(text[]),portl_auth.cleanup_account_metadata(),portl_auth.cleanup_review_lifecycle() TO ${who}`,

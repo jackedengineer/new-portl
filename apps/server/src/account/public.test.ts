@@ -15,8 +15,14 @@ it('discloses actual production hosting, provider retention and deletion limits 
   expect(response.status).toBe(200);
   expect(response.type).toBe('text/html');
   for (const fact of [
-    '14 October 2026',
-    'California, United States',
+    '18 October 2026',
+    'Render Free service in Singapore',
+    'independent Neon project',
+    'previous Railway service is offline',
+    'trial-volume retention deadline',
+    'Restoration from older backups remains blocked',
+    'visitor or guest name',
+    'lock screen',
     'Singapore',
     '6 hours',
     'Resend',
@@ -36,7 +42,7 @@ it('discloses actual production hosting, provider retention and deletion limits 
 });
 
 it('requires the revised policy without silently accepting the earlier edition', () => {
-  expect(POLICY_VERSION).toBe('2026-10-14');
+  expect(POLICY_VERSION).toBe('2026-10-18');
   expect(
     policyAcceptanceInput.safeParse({
       adult: true,

@@ -101,7 +101,9 @@ export function NotificationInbox({ userId }: { userId: string }) {
         <Label>Stay close to your community</Label>
         <Copy>
           Your private inbox keeps gate updates and society notices together.
-          Push alerts show a generic message on your lock screen.
+          Push previews include visitor names, gate updates and notice excerpts.
+          Anyone who can see your lock screen may see those details. You can
+          hide previews in your phone’s notification settings.
         </Copy>
         {pushAvailable() ? (
           <Button
@@ -148,8 +150,11 @@ export function NotificationInbox({ userId }: { userId: string }) {
       {items.map((item) => (
         <Card key={item.id}>
           <Badge>{item.readAt ? 'Read' : 'Unread'}</Badge>
-          <Identity title={notificationCopy[item.type].title} icon="bell" />
-          <Copy>{notificationCopy[item.type].body}</Copy>
+          <Identity
+            title={(item.preview ?? notificationCopy[item.type]).title}
+            icon="bell"
+          />
+          <Copy>{(item.preview ?? notificationCopy[item.type]).body}</Copy>
           <Copy small>{new Date(item.createdAt).toLocaleString()}</Copy>
           <Button
             label="Open notification"

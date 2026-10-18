@@ -66,7 +66,7 @@ export async function grantRuntime(client: pg.Client, role: string) {
     `GRANT UPDATE ("readAt") ON portl_notifications."Notification" TO ${who}`,
   );
   await client.query(
-    `GRANT EXECUTE ON FUNCTION portl_notifications.eligible(portl_notifications."Notification"), portl_notifications.register_device(text,text,text,text,text), portl_notifications.remove_device(text), portl_gate.notify_request(text), portl_gate.notify_pass(text) TO ${who}`,
+    `GRANT EXECUTE ON FUNCTION portl_notifications.eligible(portl_notifications."Notification"), portl_notifications.inbox_previews(text[]), portl_notifications.register_device(text,text,text,text,text), portl_notifications.remove_device(text), portl_gate.notify_request(text), portl_gate.notify_pass(text) TO ${who}`,
   );
   await client.query(
     `GRANT SELECT ON ALL TABLES IN SCHEMA portl_jobs TO ${who}`,

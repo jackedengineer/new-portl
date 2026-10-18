@@ -104,7 +104,7 @@ it('previews the invited flat and requires explicit acceptance', async () => {
             society,
             flat,
             relationship: 'TENANT',
-            expiresAt: '2026-10-17T10:00:00Z',
+            expiresAt: '2026-10-18T10:00:00Z',
           }
         : { societyId: 's1' },
     ),
@@ -166,7 +166,7 @@ it('renders invitation management without raw native text and shows the one-time
       path.endsWith('/flats')
         ? { flats: [flat] }
         : body
-          ? { token: 'B'.repeat(43), expiresAt: '2026-10-17T10:00:00Z' }
+          ? { token: 'B'.repeat(43), expiresAt: '2026-10-18T10:00:00Z' }
           : { items: [], nextCursor: null },
     ),
   );
@@ -276,7 +276,7 @@ it('lets an admin retry a failed page and invite a flat beyond the first 500', a
       }
       return Promise.resolve(
         body
-          ? { token: 'C'.repeat(43), expiresAt: '2026-10-17T10:00:00Z' }
+          ? { token: 'C'.repeat(43), expiresAt: '2026-10-18T10:00:00Z' }
           : { items: [], nextCursor: null },
       );
     },
