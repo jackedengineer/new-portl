@@ -4,6 +4,7 @@ import pg from 'pg';
 import { expect, it } from 'vitest';
 import { postgresOptions } from '../database/connection.js';
 import { databaseLedger, readDatabaseLedger } from './database-ledger.js';
+import { assertLedgerRestoreAllowed } from './restore-gate.js';
 
 it('enforces restricted durable writes, monotonic expiry, atomic batches and owner-only streaming', async () => {
   if (process.env.NODE_ENV !== 'test' || !process.env.PORTL_TEST_DATABASE_URL)
@@ -20,6 +21,7 @@ it('enforces restricted durable writes, monotonic expiry, atomic batches and own
   let worker: pg.Pool | undefined;
   await owner.connect();
   try {
+    await owner.query('DROP TABLE IF EXISTS portl_erasure_ledger.restore_gate');
     await owner.query(
       await readFile(
         new URL('../../sql/erasure-ledger.sql', import.meta.url),
@@ -41,6 +43,37 @@ it('enforces restricted durable writes, monotonic expiry, atomic batches and own
     worker = new pg.Pool({ ...postgresOptions(runtime.toString()), max: 1 });
     const store = databaseLedger(worker);
     await store.assertReady();
+    await expect(assertLedgerRestoreAllowed(owner)).rejects.toThrow(
+      'reconciliation',
+    );
+    await owner.query('DELETE FROM portl_erasure_ledger.restore_gate');
+    await expect(assertLedgerRestoreAllowed(owner)).rejects.toThrow(
+      'reconciliation',
+    );
+    await expect(
+      worker.query(
+        'UPDATE portl_erasure_ledger.restore_gate SET blocked=false',
+      ),
+    ).rejects.toThrow();
+    await expect(assertLedgerRestoreAllowed(worker)).rejects.toThrow();
+    await owner.query(
+      await readFile(
+        new URL('../../sql/erasure-ledger.sql', import.meta.url),
+        'utf8',
+      ),
+    );
+    await expect(assertLedgerRestoreAllowed(owner)).rejects.toThrow(
+      'reconciliation',
+    );
+    await owner.query(
+      await readFile(
+        new URL('../../sql/erasure-ledger.sql', import.meta.url),
+        'utf8',
+      ),
+    );
+    await expect(assertLedgerRestoreAllowed(owner)).rejects.toThrow(
+      'reconciliation',
+    );
     const expiry = new Date(Date.now() + 2 * 86400000).toISOString();
     await store.persist([{ subjectHash: hashes[0]!, expiresAt: expiry }]);
     await store.persist([
@@ -89,10 +122,17 @@ it('enforces restricted durable writes, monotonic expiry, atomic batches and own
         )
       ).rows.map((row) => row.subject_hash),
     ).toEqual([hashes[0]]);
+    await expect(assertLedgerRestoreAllowed(owner)).rejects.toThrow(
+      'reconciliation',
+    );
     const streamed = [];
     for await (const entry of readDatabaseLedger(owner))
       if (hashes.includes(entry.subjectHash)) streamed.push(entry);
     expect(streamed).toEqual([{ subjectHash: hashes[0], expiresAt: expiry }]);
+    await owner.query(
+      'UPDATE portl_erasure_ledger.restore_gate SET blocked=false WHERE singleton',
+    );
+    await assertLedgerRestoreAllowed(owner);
     await owner.query(
       `GRANT SELECT ON portl_erasure_ledger.tombstone TO ${pg.escapeIdentifier(role)}`,
     );

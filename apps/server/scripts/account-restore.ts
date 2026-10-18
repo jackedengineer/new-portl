@@ -7,6 +7,7 @@ import {
 } from '../src/account/database-ledger.js';
 import { postgresOptions } from '../src/database/connection.js';
 import pg from 'pg';
+import { assertLedgerRestoreAllowed } from '../src/account/restore-gate.js';
 const [flag, path] = process.argv.slice(2);
 if (flag !== '--offline-restore' || !path || !process.env.DIRECT_DATABASE_URL)
   throw new Error(
@@ -15,7 +16,7 @@ if (flag !== '--offline-restore' || !path || !process.env.DIRECT_DATABASE_URL)
 const db = createDatabase(process.env.DIRECT_DATABASE_URL);
 let ledgerClient: pg.Pool | undefined;
 try {
-  if (path === 'database') {
+  if (path === 'database' || process.env.ERASURE_LEDGER_OWNER_URL) {
     if (!process.env.ERASURE_LEDGER_OWNER_URL)
       throw new Error(
         'Independent ledger owner URL required for offline restore',
@@ -29,10 +30,13 @@ try {
       ),
       max: 1,
     });
+    await assertLedgerRestoreAllowed(ledgerClient);
   }
   const queued = await restoreAccountErasures(
     db,
-    ledgerClient ? readDatabaseLedger(ledgerClient) : readLedger(path),
+    path === 'database' && ledgerClient
+      ? readDatabaseLedger(ledgerClient)
+      : readLedger(path),
   );
   console.log(
     `Reapplied ${queued} account erasures. Complete restore acceptance checks before reopening access.`,
