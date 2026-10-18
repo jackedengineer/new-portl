@@ -23,6 +23,7 @@
     "db:reviewer": "tsx --env-file-if-exists=.env scripts/reviewer.ts"
   },
   "dependencies": {
+    "@better-auth/core": "1.7.7",
     "@better-auth/expo": "1.7.7",
     "@better-auth/prisma-adapter": "1.7.7",
     "@better-auth/utils": "0.4.2",

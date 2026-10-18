@@ -1,4 +1,5 @@
 import { sharedReviewAccount } from '../reviewer/service.js';
+import { requestClientIP } from '../hosting/client-ip.js';
 import {
   recoveryEnrollInput,
   recoveryConfirmInput,
@@ -96,7 +97,7 @@ export function accountRouter(auth: PortlAuth) {
           auth,
           String(req.params.action),
           req.body,
-          req.ip || '127.0.0.1',
+          requestClientIP(req),
         ),
       ),
     ),

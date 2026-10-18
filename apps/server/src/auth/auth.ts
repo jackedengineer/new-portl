@@ -2,6 +2,7 @@ import { reviewLifecycle, lifecycleEmail } from '../reviewer/lifecycle.js';
 import { reviewerPlugin } from '../reviewer/plugin.js';
 import { reviewerService } from '../reviewer/service.js';
 import { adminRecoveryService } from '../recovery/service.js';
+import { CLIENT_IPV6_SUBNET } from '../hosting/client-ip.js';
 import { checkEmailChange } from '../account/email-auth.js';
 import { POLICY_VERSION, policyAcceptanceInput } from '@portl/contracts';
 import { accountService } from '../account/service.js';
@@ -86,7 +87,10 @@ export function createAuth(
       cookiePrefix: 'portl',
       disableOriginCheck: false,
       disableCSRFCheck: false,
-      ipAddress: { ipAddressHeaders: ['x-portl-client-ip'] },
+      ipAddress: {
+        ipAddressHeaders: ['x-portl-client-ip'],
+        ipv6Subnet: CLIENT_IPV6_SUBNET,
+      },
     },
     // HTTP logging records only request ID, method and status in the Express boundary.
     logger: { disabled: true },

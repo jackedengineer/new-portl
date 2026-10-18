@@ -8,16 +8,18 @@ describe('runtime environment', () => {
       NODE_ENV: 'development',
       HOST: '0.0.0.0',
       PORT: 3000,
-      TRUST_PROXY_HOPS: 0,
+      TRUSTED_INGRESS: 'none',
       LOG_LEVEL: 'info',
     });
   });
 
-  it('requires an explicit single-hop ingress and rejects blanket or longer proxy trust', () => {
-    expect(parseRuntimeEnv({ TRUST_PROXY_HOPS: '1' }).TRUST_PROXY_HOPS).toBe(1);
-    for (const value of ['true', '*', '2', '-1', ''])
-      expect(() => parseRuntimeEnv({ TRUST_PROXY_HOPS: value })).toThrow(
-        'TRUST_PROXY_HOPS',
+  it('requires an explicit provider boundary and rejects numeric or blanket proxy trust', () => {
+    expect(parseRuntimeEnv({ TRUSTED_INGRESS: 'render' }).TRUSTED_INGRESS).toBe(
+      'render',
+    );
+    for (const value of ['true', '*', '1', 'cloudflare', ''])
+      expect(() => parseRuntimeEnv({ TRUSTED_INGRESS: value })).toThrow(
+        'TRUSTED_INGRESS',
       );
   });
 
