@@ -19,6 +19,7 @@ type WorkerState = {
 const common = ['NODE_ENV', 'HOST', 'PORT', 'LOG_LEVEL', 'TZ'];
 const keys = {
   api: [
+    'TRUST_PROXY_HOPS',
     'DATABASE_URL',
     'BETTER_AUTH_SECRET',
     'BETTER_AUTH_URL',

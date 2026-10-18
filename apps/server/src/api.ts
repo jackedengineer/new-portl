@@ -31,14 +31,18 @@ const auth = createAuth(
   resendDelivery(authEnv.RESEND_API_KEY, authEnv.EMAIL_FROM),
 );
 const server = createServer(
-  createApp(logger, {
-    auth,
-    db,
-    baseURL: authEnv.BETTER_AUTH_URL,
-    passCodes: passCodes(authEnv.BETTER_AUTH_SECRET),
-    tokenCipher: tokenCipher(authEnv.BETTER_AUTH_SECRET),
-    onGateChange: (signal) => live.publish(signal),
-  }),
+  createApp(
+    logger,
+    {
+      auth,
+      db,
+      baseURL: authEnv.BETTER_AUTH_URL,
+      passCodes: passCodes(authEnv.BETTER_AUTH_SECRET),
+      tokenCipher: tokenCipher(authEnv.BETTER_AUTH_SECRET),
+      onGateChange: (signal) => live.publish(signal),
+    },
+    env.TRUST_PROXY_HOPS,
+  ),
 );
 const live = createGateSocketServer(server, {
   authorize: gateLiveAccess(auth, db),

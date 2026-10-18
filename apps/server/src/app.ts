@@ -32,8 +32,13 @@ type AppServices = {
   onGateChange?: (signal: GateSignal) => void;
 };
 
-export function createApp(logger?: Logger, services?: AppServices) {
+export function createApp(
+  logger?: Logger,
+  services?: AppServices,
+  trustedProxyHops: 0 | 1 = 0,
+) {
   const app = express();
+  app.set('trust proxy', trustedProxyHops === 1 ? 1 : false);
   app.disable('x-powered-by');
   app.use(helmet());
   app.use((req, res, next) => {
@@ -109,7 +114,8 @@ export function createApp(logger?: Logger, services?: AppServices) {
           return;
         }
         const headers = fromNodeHeaders(req.headers);
-        // req.ip uses Express's default trust-proxy=false. Ignore spoofed forwarding headers.
+        // Resolve through the configured ingress boundary; never trust the
+        // caller's internal auth header or the leftmost forwarded address.
         headers.set('x-portl-client-ip', req.ip || '127.0.0.1');
         headers.delete('content-length');
         // Use Better Auth's Fetch handler after bounded JSON parsing. Its Node adapter expects an unread stream.

@@ -8,8 +8,17 @@ describe('runtime environment', () => {
       NODE_ENV: 'development',
       HOST: '0.0.0.0',
       PORT: 3000,
+      TRUST_PROXY_HOPS: 0,
       LOG_LEVEL: 'info',
     });
+  });
+
+  it('requires an explicit single-hop ingress and rejects blanket or longer proxy trust', () => {
+    expect(parseRuntimeEnv({ TRUST_PROXY_HOPS: '1' }).TRUST_PROXY_HOPS).toBe(1);
+    for (const value of ['true', '*', '2', '-1', ''])
+      expect(() => parseRuntimeEnv({ TRUST_PROXY_HOPS: value })).toThrow(
+        'TRUST_PROXY_HOPS',
+      );
   });
 
   it('uses the port supplied by the host', () => {
