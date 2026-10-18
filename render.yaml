@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: portl-api
+    runtime: node
+    plan: free
+    region: singapore
+    repo: https://github.com/jackedengineer/new-portl
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: bash scripts/render-build.sh
+    startCommand: pnpm --filter @portl/server start:render
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.0
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: LOG_LEVEL
+        value: info
+      - key: BETTER_AUTH_URL
+        value: https://api.portl.jacked.dev
+      - key: TRUSTED_ORIGINS
+        value: portl://,https://api.portl.jacked.dev
+      - key: EMAIL_FROM
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WORKER_DATABASE_URL
+        sync: false
+      - key: ERASURE_LEDGER_DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false

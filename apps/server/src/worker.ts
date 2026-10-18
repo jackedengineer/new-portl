@@ -16,6 +16,7 @@ import { notificationQueue } from './notifications/jobs.js';
 import { assertNotificationWorker } from './notifications/worker-access.js';
 import { tokenCipher } from './notifications/tokens.js';
 import { expoProvider } from './notifications/provider.js';
+import { idleWorker } from './hosting/idle-worker.js';
 import {
   deliverNotification,
   collectReceipt,
@@ -38,6 +39,12 @@ const config = z
       (value) => (value === '' ? undefined : value),
       z.url().optional(),
     ),
+    PORTL_WORKER_IDLE_MS: z.coerce
+      .number()
+      .int()
+      .min(30000)
+      .max(300000)
+      .optional(),
   })
   .safeParse(process.env);
 if (
@@ -60,6 +67,7 @@ const db = createDatabase(config.data.WORKER_DATABASE_URL),
   provider = expoProvider(config.data.EXPO_ACCESS_TOKEN);
 let stopAccounts: (() => Promise<void>) | undefined;
 let ledgerClient: pg.Pool | undefined;
+let idle: ReturnType<typeof idleWorker> | undefined;
 try {
   let storage: DeletionLedger;
   if (config.data.ERASURE_LEDGER_DATABASE_URL) {
@@ -89,40 +97,48 @@ try {
       name,
       { batchSize: 1, pollingIntervalSeconds: 3 },
       async (jobs) => {
-        for (const job of jobs) {
-          try {
-            if (name === 'notification.push')
-              await deliverNotification(
-                db,
-                boss,
-                provider,
-                cipher,
-                z.strictObject({ notificationId: z.uuid() }).parse(job.data)
-                  .notificationId,
+        const run = async () => {
+          for (const job of jobs) {
+            try {
+              if (name === 'notification.push')
+                await deliverNotification(
+                  db,
+                  boss,
+                  provider,
+                  cipher,
+                  z.strictObject({ notificationId: z.uuid() }).parse(job.data)
+                    .notificationId,
+                );
+              else
+                await collectReceipt(
+                  db,
+                  provider,
+                  z.strictObject({ deliveryId: z.uuid() }).parse(job.data)
+                    .deliveryId,
+                );
+              logger.info(
+                { queue: name, jobId: job.id },
+                'Notification job completed',
               );
-            else
-              await collectReceipt(
-                db,
-                provider,
-                z.strictObject({ deliveryId: z.uuid() }).parse(job.data)
-                  .deliveryId,
+            } catch {
+              logger.warn(
+                { queue: name, jobId: job.id },
+                'Notification job will retry within its configured limit',
               );
-            logger.info(
-              { queue: name, jobId: job.id },
-              'Notification job completed',
-            );
-          } catch {
-            logger.warn(
-              { queue: name, jobId: job.id },
-              'Notification job will retry within its configured limit',
-            );
-            throw new Error('NOTIFICATION_JOB_RETRY');
+              throw new Error('NOTIFICATION_JOB_RETRY');
+            }
           }
-        }
+        };
+        if (idle) await idle.run(run);
+        else await run();
       },
     );
-  stopAccounts = await accountWorker(db, logger, storage);
+  stopAccounts = await accountWorker(db, logger, storage, () => {
+    idle?.touch();
+  });
+  await maintain();
   logger.info('Notification and account lifecycle worker ready');
+  process.send?.({ type: 'ready' }, () => {});
 } catch {
   logger.fatal(
     'Notification worker startup failed; check restricted grants and queue initialization',
@@ -132,23 +148,63 @@ try {
   await ledgerClient?.end();
   process.exit(1);
 }
-const maintenance = setInterval(
-  () =>
-    void db.$queryRaw`SELECT portl_notifications.cleanup()`.catch(() =>
-      logger.error('Notification retention maintenance failed'),
-    ),
-  3600000,
-);
+let maintenanceRunning = Promise.resolve();
+async function maintain() {
+  await db.$queryRaw`SELECT portl_notifications.cleanup()`.catch(() =>
+    logger.error('Notification retention maintenance failed'),
+  );
+}
+const maintenance = setInterval(() => {
+  maintenanceRunning = maintenanceRunning.then(maintain);
+}, 3600000);
 maintenance.unref();
-let stopping = false;
-async function stop() {
-  if (stopping) return;
-  stopping = true;
+let stopPromise: Promise<void> | undefined;
+function stop(parking = false) {
+  return (stopPromise ??= shutdown(parking));
+}
+async function shutdown(parking: boolean) {
+  if (parking) process.send?.({ type: 'parking' }, () => {});
+  idle?.stop();
   clearInterval(maintenance);
+  // offWork stops new claims and waits for each handler's acknowledgement;
+  // routine parking must never fail active jobs at a short stop deadline.
+  await Promise.all(
+    ['notification.push', 'notification.receipt'].map((name) =>
+      boss.offWork(name, { wait: true }),
+    ),
+  );
   await stopAccounts?.();
-  await boss.stop({ timeout: 15000 });
+  await maintenanceRunning;
+  await boss.stop({ timeout: 30000 });
   await db.$disconnect();
   await ledgerClient?.end();
+  if (parking) logger.info('Worker parked after inactivity');
+  if (parking && process.connected)
+    await new Promise<void>((resolve) =>
+      process.send?.({ type: 'parked' }, () => resolve()),
+    );
+  if (process.connected) process.disconnect?.();
 }
-process.once('SIGTERM', () => void stop());
-process.once('SIGINT', () => void stop());
+function fatalStop() {
+  logger.fatal('Worker shutdown failed; durable work remains queued');
+  process.exit(1);
+}
+if (config.data.PORTL_WORKER_IDLE_MS)
+  idle = idleWorker(
+    config.data.PORTL_WORKER_IDLE_MS,
+    () => stop(true),
+    fatalStop,
+  );
+process.on('message', (message) => {
+  if (
+    typeof message === 'object' &&
+    message !== null &&
+    'type' in message &&
+    message.type === 'wake' &&
+    !idle?.touch()
+  )
+    process.send?.({ type: 'wake-required' }, () => {});
+});
+process.once('SIGTERM', () => void stop().catch(fatalStop));
+process.once('SIGINT', () => void stop().catch(fatalStop));
+process.once('disconnect', () => void stop().catch(fatalStop));
